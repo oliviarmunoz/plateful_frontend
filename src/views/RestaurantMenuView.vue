@@ -48,9 +48,8 @@ onMounted(async () => {
       if (Array.isArray(recResponse) && recResponse.length > 0 && !('error' in recResponse[0])) {
         recommendation.value = recResponse[0].recommendation
       }
-    } catch (recErr) {
+    } catch {
       // If recommendation fails, still show the menu
-      console.log('Could not get recommendation:', recErr)
     }
   } catch (err: unknown) {
     const apiErr = err as { response?: { data?: { error?: string; message?: string } } }
@@ -71,8 +70,7 @@ const goHome = () => {
   router.push('/')
 }
 
-// Submit feedback for a dish
-const submitFeedback = async (dishName: string, rating: number) => {
+const submitStarRating = async (dishName: string, rating: number) => {
   if (!user.value?.id) {
     router.push('/login')
     return
@@ -91,27 +89,64 @@ const submitFeedback = async (dishName: string, rating: number) => {
       rating: rating,
     })
 
-    // Based on rating, add to liked or disliked
-    if (rating >= 4) {
-      // High rating (4-5) = liked
-      await userTastePreferencesApi.addLikedDish(userId, dishName)
-      feedbackMessage.value = `✓ Added "${dishName}" to your liked dishes!`
-    } else if (rating <= 2) {
-      // Low rating (0-2) = disliked
-      await userTastePreferencesApi.addDislikedDish(userId, dishName)
-      feedbackMessage.value = `✓ Added "${dishName}" to your disliked dishes!`
-    } else {
-      // Neutral rating (3) = just feedback, no preference
-      feedbackMessage.value = `✓ Thanks for your feedback on "${dishName}"!`
-    }
+    feedbackMessage.value = `✓ Rated "${dishName}" ${rating} star${rating !== 1 ? 's' : ''}!`
 
-    // Clear message after 3 seconds
     setTimeout(() => {
       feedbackMessage.value = ''
     }, 3000)
   } catch (err: unknown) {
     const apiErr = err as { response?: { data?: { error?: string } } }
-    feedbackMessage.value = `Error: ${apiErr?.response?.data?.error || 'Failed to submit feedback'}`
+    feedbackMessage.value = `Error: ${apiErr?.response?.data?.error || 'Failed to submit rating'}`
+  } finally {
+    submittingFeedback.value = false
+  }
+}
+
+const addToLiked = async (dishName: string) => {
+  if (!user.value?.id) {
+    router.push('/login')
+    return
+  }
+  try {
+    submittingFeedback.value = true
+    feedbackMessage.value = ''
+
+    const userId = user.value.id.toString()
+    await userTastePreferencesApi.addLikedDish(userId, dishName)
+
+    feedbackMessage.value = `✓ Added "${dishName}" to your liked dishes!`
+
+    setTimeout(() => {
+      feedbackMessage.value = ''
+    }, 3000)
+  } catch (err: unknown) {
+    const apiErr = err as { response?: { data?: { error?: string } } }
+    feedbackMessage.value = `Error: ${apiErr?.response?.data?.error || 'Failed to add to liked'}`
+  } finally {
+    submittingFeedback.value = false
+  }
+}
+
+const addToDisliked = async (dishName: string) => {
+  if (!user.value?.id) {
+    router.push('/login')
+    return
+  }
+  try {
+    submittingFeedback.value = true
+    feedbackMessage.value = ''
+
+    const userId = user.value.id.toString()
+    await userTastePreferencesApi.addDislikedDish(userId, dishName)
+
+    feedbackMessage.value = `✓ Added "${dishName}" to your disliked dishes!`
+
+    setTimeout(() => {
+      feedbackMessage.value = ''
+    }, 3000)
+  } catch (err: unknown) {
+    const apiErr = err as { response?: { data?: { error?: string } } }
+    feedbackMessage.value = `Error: ${apiErr?.response?.data?.error || 'Failed to add to disliked'}`
   } finally {
     submittingFeedback.value = false
   }
@@ -149,65 +184,53 @@ const submitFeedback = async (dishName: string, rating: number) => {
     <main class="main-content">
       <div class="hero-section">
         <h2 class="hero-title">{{ restaurantName }}</h2>
-        <p class="hero-subtitle">Explore the menu and see your personalized recommendation!</p>
+
+        <section class="recommendation-card" v-if="recommendation">
+          <h3>Your Dish Recommendation 🍽️</h3>
+          <p class="recommendation-text">{{ recommendation }}</p>
+
+          <!-- Star Rating -->
+          <div class="feedback-section">
+            <p class="feedback-prompt">Rate this dish:</p>
+            <div class="star-rating">
+              <button
+                v-for="star in 6"
+                :key="star - 1"
+                @click="submitStarRating(recommendation, star - 1)"
+                :disabled="submittingFeedback"
+                class="star-btn"
+                :title="`${star - 1} star${star - 1 !== 1 ? 's' : ''}`"
+              >
+                ⭐ {{ star - 1 }}
+              </button>
+            </div>
+
+            <!-- Like/Dislike Preference Buttons -->
+            <p class="preference-prompt">Add to preferences:</p>
+            <div class="preference-buttons">
+              <button
+                @click="addToLiked(recommendation)"
+                :disabled="submittingFeedback"
+                class="preference-btn like-btn"
+              >
+                👍 Like
+              </button>
+              <button
+                @click="addToDisliked(recommendation)"
+                :disabled="submittingFeedback"
+                class="preference-btn dislike-btn"
+              >
+                👎 Dislike
+              </button>
+            </div>
+
+            <!-- Feedback message -->
+            <div v-if="feedbackMessage" class="feedback-message">
+              {{ feedbackMessage }}
+            </div>
+          </div>
+        </section>
       </div>
-
-      <section class="recommendation-card" v-if="recommendation">
-        <h3>Your Dish Recommendation 🍽️</h3>
-        <p class="recommendation-text">{{ recommendation }}</p>
-
-        <!-- Feedback buttons -->
-        <div class="feedback-section">
-          <p class="feedback-prompt">How do you feel about this recommendation?</p>
-          <div class="feedback-buttons">
-            <button
-              @click="submitFeedback(recommendation, 5)"
-              :disabled="submittingFeedback"
-              class="feedback-btn love-btn"
-              title="Love it! (5 stars)"
-            >
-              😍 Love it
-            </button>
-            <button
-              @click="submitFeedback(recommendation, 4)"
-              :disabled="submittingFeedback"
-              class="feedback-btn like-btn"
-              title="Like it (4 stars)"
-            >
-              👍 Like it
-            </button>
-            <button
-              @click="submitFeedback(recommendation, 3)"
-              :disabled="submittingFeedback"
-              class="feedback-btn neutral-btn"
-              title="It's okay (3 stars)"
-            >
-              😐 It's okay
-            </button>
-            <button
-              @click="submitFeedback(recommendation, 2)"
-              :disabled="submittingFeedback"
-              class="feedback-btn dislike-btn"
-              title="Not for me (2 stars)"
-            >
-              👎 Not for me
-            </button>
-            <button
-              @click="submitFeedback(recommendation, 1)"
-              :disabled="submittingFeedback"
-              class="feedback-btn hate-btn"
-              title="Dislike (1 star)"
-            >
-              😞 Dislike
-            </button>
-          </div>
-
-          <!-- Feedback message -->
-          <div v-if="feedbackMessage" class="feedback-message">
-            {{ feedbackMessage }}
-          </div>
-        </div>
-      </section>
 
       <section v-if="loading" class="loading">Loading menu...</section>
 
@@ -224,40 +247,40 @@ const submitFeedback = async (dishName: string, rating: number) => {
             <p class="menu-item-description">{{ item.description }}</p>
             <p class="menu-item-price">${{ item.price.toFixed(2) }}</p>
 
-            <!-- Quick feedback buttons for menu items -->
-            <div class="quick-feedback">
-              <button
-                @click="submitFeedback(item.name, 5)"
-                :disabled="submittingFeedback"
-                class="quick-feedback-btn"
-                title="Love it!"
-              >
-                😍
-              </button>
-              <button
-                @click="submitFeedback(item.name, 4)"
-                :disabled="submittingFeedback"
-                class="quick-feedback-btn"
-                title="Like it"
-              >
-                👍
-              </button>
-              <button
-                @click="submitFeedback(item.name, 3)"
-                :disabled="submittingFeedback"
-                class="quick-feedback-btn"
-                title="Neutral"
-              >
-                😐
-              </button>
-              <button
-                @click="submitFeedback(item.name, 1)"
-                :disabled="submittingFeedback"
-                class="quick-feedback-btn"
-                title="Dislike"
-              >
-                👎
-              </button>
+            <!-- Star rating for menu items -->
+            <div class="menu-item-actions">
+              <div class="menu-star-rating">
+                <button
+                  v-for="star in 6"
+                  :key="star - 1"
+                  @click="submitStarRating(item.name, star - 1)"
+                  :disabled="submittingFeedback"
+                  class="menu-star-btn"
+                  :title="`${star - 1} star${star - 1 !== 1 ? 's' : ''}`"
+                >
+                  {{ star - 1 }}⭐
+                </button>
+              </div>
+
+              <!-- Like/Dislike buttons -->
+              <div class="menu-preference-buttons">
+                <button
+                  @click="addToLiked(item.name)"
+                  :disabled="submittingFeedback"
+                  class="menu-pref-btn like"
+                  title="Add to liked"
+                >
+                  👍
+                </button>
+                <button
+                  @click="addToDisliked(item.name)"
+                  :disabled="submittingFeedback"
+                  class="menu-pref-btn dislike"
+                  title="Add to disliked"
+                >
+                  👎
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -372,59 +395,89 @@ const submitFeedback = async (dishName: string, rating: number) => {
   margin-top: 2rem;
 }
 
-.feedback-prompt {
+.feedback-prompt,
+.preference-prompt {
   color: rgba(255, 255, 255, 0.9);
   font-size: 1.1rem;
   margin-bottom: 1rem;
+  margin-top: 1.5rem;
 }
 
-.feedback-buttons {
+.preference-prompt {
+  margin-top: 2rem;
+}
+
+.star-rating {
   display: flex;
   gap: 0.5rem;
   justify-content: center;
   flex-wrap: wrap;
 }
 
-.feedback-btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
+.star-btn {
+  padding: 0.75rem 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 1rem;
   transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
   color: white;
 }
 
-.feedback-btn:hover:not(:disabled) {
+.star-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
-.feedback-btn:disabled {
+.star-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.love-btn:hover:not(:disabled) {
+.preference-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.preference-btn {
+  padding: 0.75rem 2rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1.1rem;
+  transition: all 0.3s ease;
+  color: white;
+}
+
+.preference-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.preference-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.preference-btn.like-btn {
   background: #22c55e;
 }
 
-.like-btn:hover:not(:disabled) {
-  background: #84cc16;
+.preference-btn.like-btn:hover:not(:disabled) {
+  background: #16a34a;
 }
 
-.neutral-btn:hover:not(:disabled) {
-  background: #eab308;
-}
-
-.dislike-btn:hover:not(:disabled) {
-  background: #f97316;
-}
-
-.hate-btn:hover:not(:disabled) {
+.preference-btn.dislike-btn {
   background: #ef4444;
+}
+
+.preference-btn.dislike-btn:hover:not(:disabled) {
+  background: #dc2626;
 }
 
 .feedback-message {
@@ -506,35 +559,75 @@ const submitFeedback = async (dishName: string, rating: number) => {
   margin-bottom: 1rem;
 }
 
-.quick-feedback {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
+.menu-item-actions {
   padding-top: 1rem;
   border-top: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.quick-feedback-btn {
-  background: none;
+.menu-star-rating {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.menu-star-btn {
+  background: white;
   border: 2px solid #e5e7eb;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  font-size: 1.2rem;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  color: #606c38;
 }
 
-.quick-feedback-btn:hover:not(:disabled) {
-  transform: scale(1.1);
+.menu-star-btn:hover:not(:disabled) {
+  transform: scale(1.05);
   border-color: #606c38;
   background: rgba(96, 108, 56, 0.1);
 }
 
-.quick-feedback-btn:disabled {
+.menu-star-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.menu-preference-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.menu-pref-btn {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.menu-pref-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+}
+
+.menu-pref-btn.like:hover:not(:disabled) {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.menu-pref-btn.dislike:hover:not(:disabled) {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.menu-pref-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

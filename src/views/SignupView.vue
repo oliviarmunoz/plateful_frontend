@@ -170,24 +170,6 @@ const handleSignup = async () => {
 </script>
 
 <style scoped>
-html,
-body,
-#app {
-  height: 100%;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-}
-
-body {
-  font-family: 'Montserrat', sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  font-optical-sizing: auto;
-  font-weight: 800;
-  font-style: normal;
-}
-
 .signup-page {
   min-height: 100vh;
   width: 100vw;

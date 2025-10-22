@@ -23,11 +23,13 @@ export interface GetUsernameResponse {
 }
 
 export const userAuthenticationApi = {
+  // Register a new user
   async register(payload: RegisterPayload) {
     const res = await apiClient.post<RegisterResponse>('/UserAuthentication/register', payload)
     return res.data
   },
 
+  // Authenticate a user
   async authenticate(payload: AuthenticatePayload) {
     const res = await apiClient.post<AuthenticateResponse>(
       '/UserAuthentication/authenticate',
@@ -36,6 +38,7 @@ export const userAuthenticationApi = {
     return res.data
   },
 
+  // Get the username of a user
   async getUsername(userId: string | number) {
     const res = await apiClient.post<GetUsernameResponse[]>('/UserAuthentication/_getUsername', {
       user: userId,

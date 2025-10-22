@@ -1,3 +1,45 @@
+<script setup lang="ts">
+import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
+import { userAuthenticationApi } from '@/api'
+
+const router = useRouter()
+const loading = ref(false)
+const error = ref('')
+
+const form = reactive<{ username: string; password: string; rememberMe: boolean }>({
+  username: '',
+  password: '',
+  rememberMe: false,
+})
+
+const handleLogin = async () => {
+  try {
+    loading.value = true
+    error.value = ''
+
+    const authRes = await userAuthenticationApi.authenticate({
+      username: form.username,
+      password: form.password,
+    })
+
+    // Persist minimal session
+    const userId = authRes.user
+    const userSession = { id: userId, username: form.username }
+    localStorage.setItem('user', JSON.stringify(userSession))
+    // Redirect to home page
+    router.push('/')
+  } catch (err: unknown) {
+    const apiErr = err as { response?: { data?: { message?: string } }; message?: string }
+    const message =
+      apiErr?.response?.data?.message || apiErr?.message || 'Login failed. Please try again.'
+    error.value = message
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
 <template>
   <div class="login-page">
     <div class="login-container">
@@ -53,67 +95,7 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
-import { userAuthenticationApi } from '@/api'
-
-const router = useRouter()
-const loading = ref(false)
-const error = ref('')
-
-const form = reactive<{ username: string; password: string; rememberMe: boolean }>({
-  username: '',
-  password: '',
-  rememberMe: false,
-})
-
-const handleLogin = async () => {
-  try {
-    loading.value = true
-    error.value = ''
-
-    const authRes = await userAuthenticationApi.authenticate({
-      username: form.username,
-      password: form.password,
-    })
-
-    // Persist minimal session
-    const userId = authRes.user
-    const userSession = { id: userId, username: form.username }
-    localStorage.setItem('user', JSON.stringify(userSession))
-    // Redirect to home page
-    router.push('/')
-  } catch (err: unknown) {
-    const apiErr = err as { response?: { data?: { message?: string } }; message?: string }
-    const message =
-      apiErr?.response?.data?.message || apiErr?.message || 'Login failed. Please try again.'
-    error.value = message
-  } finally {
-    loading.value = false
-  }
-}
-</script>
-
 <style scoped>
-html,
-body,
-#app {
-  height: 100%;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-}
-
-body {
-  font-family: 'Montserrat', sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  font-optical-sizing: auto;
-  font-weight: 800;
-  font-style: normal;
-}
-
 .login-page {
   min-height: 100vh;
   width: 100vw;

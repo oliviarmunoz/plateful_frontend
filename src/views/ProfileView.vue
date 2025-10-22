@@ -31,34 +31,31 @@ const loadUserData = async () => {
     user.value = currentUser
 
     // Load user's taste preferences
+    const userId = currentUser.id.toString()
     const [likedResponse, dislikedResponse] = await Promise.all([
-      userTastePreferencesApi.getLikedDishes(currentUser.id),
-      userTastePreferencesApi.getDislikedDishes(currentUser.id),
+      userTastePreferencesApi.getLikedDishes(userId),
+      userTastePreferencesApi.getDislikedDishes(userId),
     ])
 
-    likedDishes.value =
-      likedResponse.length > 0
-        ? Array.isArray(likedResponse[0].dishes)
-          ? likedResponse[0].dishes
-          : [likedResponse[0].dishes]
-        : []
+    if (Array.isArray(likedResponse) && likedResponse.length > 0) {
+      likedDishes.value = likedResponse.map((item) => item.dishes).filter((dish) => dish)
+    } else {
+      likedDishes.value = []
+    }
 
-    dislikedDishes.value =
-      dislikedResponse.length > 0
-        ? Array.isArray(dislikedResponse[0].dishes)
-          ? dislikedResponse[0].dishes
-          : [dislikedResponse[0].dishes]
-        : []
+    if (Array.isArray(dislikedResponse) && dislikedResponse.length > 0) {
+      dislikedDishes.value = dislikedResponse.map((item) => item.dishes).filter((dish) => dish)
+    } else {
+      dislikedDishes.value = []
+    }
   } catch (err: unknown) {
     const apiError = err as ApiError
     error.value = apiError.response?.data?.message || 'Failed to load user data'
-    console.error('Error loading user data:', err)
   } finally {
     loading.value = false
   }
 }
 
-// Remove dish from liked list
 const removeLikedDish = async (dish: string) => {
   try {
     await userTastePreferencesApi.removeLikedDish(user.value!.id.toString(), dish)
@@ -69,7 +66,6 @@ const removeLikedDish = async (dish: string) => {
   }
 }
 
-// Remove dish from disliked list
 const removeDislikedDish = async (dish: string) => {
   try {
     await userTastePreferencesApi.removeDislikedDish(user.value!.id.toString(), dish)
@@ -80,7 +76,6 @@ const removeDislikedDish = async (dish: string) => {
   }
 }
 
-// Logout function
 const logout = () => {
   localStorage.removeItem('auth_token')
   localStorage.removeItem('user')
@@ -91,7 +86,6 @@ const goHome = () => {
   router.push('/')
 }
 
-// Computed properties
 const totalPreferences = computed(() => likedDishes.value.length + dislikedDishes.value.length)
 
 onMounted(() => {
@@ -108,7 +102,7 @@ onMounted(() => {
       rel="stylesheet"
     />
 
-    <!-- Header with navigation -->
+    <!-- Header with nav -->
     <header class="header">
       <div class="nav-container">
         <nav class="auth-nav">
@@ -152,15 +146,12 @@ onMounted(() => {
       </div>
     </header>
 
-    <!-- Main content -->
     <main class="main-content">
-      <!-- Loading state -->
       <div v-if="loading" class="loading">
         <div class="loading-spinner"></div>
         <p>Loading your profile...</p>
       </div>
 
-      <!-- Error state -->
       <div v-else-if="error" class="error">
         <h3>Error</h3>
         <p>{{ error }}</p>
@@ -293,24 +284,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-html,
-body,
-#app {
-  height: 100%;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-}
-
-body {
-  font-family: 'Montserrat', sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  font-optical-sizing: auto;
-  font-weight: 800;
-  font-style: normal;
-}
-
 .profile-page {
   min-height: 100vh;
   width: 100vw;

@@ -1,9 +1,26 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const searchQuery = ref('')
+
+// Check if user is logged in
+const getCurrentUser = () => {
+  const userData = localStorage.getItem('user')
+  if (userData) {
+    return JSON.parse(userData)
+  }
+  return null
+}
+
+// Redirect to login if not logged in
+onMounted(() => {
+  const user = getCurrentUser()
+  if (!user) {
+    router.push('/login')
+  }
+})
 
 const handleSearch = () => {
   if (searchQuery.value.trim()) {
@@ -82,24 +99,6 @@ const goToProfile = () => {
 </template>
 
 <style scoped>
-html,
-body,
-#app {
-  height: 100%;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-}
-
-body {
-  font-family: 'Montserrat', sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  font-optical-sizing: auto;
-  font-weight: 800;
-  font-style: normal;
-}
-
 .home-page {
   min-height: 100vh;
   width: 100vw;
