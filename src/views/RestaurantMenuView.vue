@@ -38,6 +38,9 @@ onMounted(async () => {
     const menuResponse = await restaurantMenuApi._getMenuItems(restaurantName)
     if (Array.isArray(menuResponse) && menuResponse.length > 0 && 'error' in menuResponse[0]) {
       error.value = menuResponse[0].error
+    } else if (Array.isArray(menuResponse) && menuResponse.length === 0) {
+      // restaurant not found
+      error.value = 'RESTAURANT_NOT_FOUND'
     } else if (Array.isArray(menuResponse)) {
       menuItems.value = menuResponse as { name: string; description: string; price: number }[]
     }
@@ -182,109 +185,129 @@ const addToDisliked = async (dishName: string) => {
     </header>
 
     <main class="main-content">
-      <div class="hero-section">
-        <h2 class="hero-title">{{ restaurantName }}</h2>
-
-        <section class="recommendation-card" v-if="recommendation">
-          <h3>Your Dish Recommendation 🍽️</h3>
-          <p class="recommendation-text">{{ recommendation }}</p>
-
-          <!-- Star Rating -->
-          <div class="feedback-section">
-            <p class="feedback-prompt">Rate this dish:</p>
-            <div class="star-rating">
-              <button
-                v-for="star in 6"
-                :key="star - 1"
-                @click="submitStarRating(recommendation, star - 1)"
-                :disabled="submittingFeedback"
-                class="star-btn"
-                :title="`${star - 1} star${star - 1 !== 1 ? 's' : ''}`"
-              >
-                ⭐ {{ star - 1 }}
-              </button>
-            </div>
-
-            <!-- Like/Dislike Preference Buttons -->
-            <p class="preference-prompt">Add to preferences:</p>
-            <div class="preference-buttons">
-              <button
-                @click="addToLiked(recommendation)"
-                :disabled="submittingFeedback"
-                class="preference-btn like-btn"
-              >
-                👍 Like
-              </button>
-              <button
-                @click="addToDisliked(recommendation)"
-                :disabled="submittingFeedback"
-                class="preference-btn dislike-btn"
-              >
-                👎 Dislike
-              </button>
-            </div>
-
-            <!-- Feedback message -->
-            <div v-if="feedbackMessage" class="feedback-message">
-              {{ feedbackMessage }}
-            </div>
-          </div>
-        </section>
-      </div>
-
       <section v-if="loading" class="loading">Loading menu...</section>
 
-      <section v-else-if="error" class="error">
-        {{ error }}
+      <section v-else-if="error === 'RESTAURANT_NOT_FOUND'" class="error-not-found">
+        <div class="error-content">
+          <div class="error-emoji">😢</div>
+          <h2 class="error-title">Restaurant Not Found</h2>
+          <p class="error-message">
+            We couldn't find restaurant "<strong>{{ restaurantName }}</strong
+            >".
+          </p>
+          <p class="error-suggestion">Maybe try searching for a different restaurant?</p>
+          <button @click="goHome" class="error-button">← Back to Search</button>
+        </div>
       </section>
 
-      <section v-else class="menu-section">
-        <h3 class="menu-title">Full Menu</h3>
-        <p class="menu-subtitle">Rate any dish to improve your future recommendations!</p>
-        <div class="menu-grid">
-          <div v-for="item in menuItems" :key="item.name" class="menu-item-card">
-            <h4 class="menu-item-name">{{ item.name }}</h4>
-            <p class="menu-item-description">{{ item.description }}</p>
-            <p class="menu-item-price">${{ item.price.toFixed(2) }}</p>
+      <section v-else-if="error" class="error">
+        <div class="error-content">
+          <div class="error-emoji">⚠️</div>
+          <h2 class="error-title">Something went wrong</h2>
+          <p class="error-message">{{ error }}</p>
+          <button @click="goHome" class="error-button">← Back to Search</button>
+        </div>
+      </section>
 
-            <!-- Star rating for menu items -->
-            <div class="menu-item-actions">
-              <div class="menu-star-rating">
+      <template v-else>
+        <div class="hero-section">
+          <h2 class="hero-title">{{ restaurantName }}</h2>
+
+          <section class="recommendation-card" v-if="recommendation">
+            <h3>Your Dish Recommendation 🍽️</h3>
+            <p class="recommendation-text">{{ recommendation }}</p>
+
+            <!-- Star Rating -->
+            <div class="feedback-section">
+              <p class="feedback-prompt">Rate this dish:</p>
+              <div class="star-rating">
                 <button
                   v-for="star in 6"
                   :key="star - 1"
-                  @click="submitStarRating(item.name, star - 1)"
+                  @click="submitStarRating(recommendation, star - 1)"
                   :disabled="submittingFeedback"
-                  class="menu-star-btn"
+                  class="star-btn"
                   :title="`${star - 1} star${star - 1 !== 1 ? 's' : ''}`"
                 >
-                  {{ star - 1 }}⭐
+                  ⭐ {{ star - 1 }}
                 </button>
               </div>
 
-              <!-- Like/Dislike buttons -->
-              <div class="menu-preference-buttons">
+              <!-- Like/Dislike Preference Buttons -->
+              <p class="preference-prompt">Add to preferences:</p>
+              <div class="preference-buttons">
                 <button
-                  @click="addToLiked(item.name)"
+                  @click="addToLiked(recommendation)"
                   :disabled="submittingFeedback"
-                  class="menu-pref-btn like"
-                  title="Add to liked"
+                  class="preference-btn like-btn"
                 >
-                  👍
+                  👍 Like
                 </button>
                 <button
-                  @click="addToDisliked(item.name)"
+                  @click="addToDisliked(recommendation)"
                   :disabled="submittingFeedback"
-                  class="menu-pref-btn dislike"
-                  title="Add to disliked"
+                  class="preference-btn dislike-btn"
                 >
-                  👎
+                  👎 Dislike
                 </button>
+              </div>
+
+              <!-- Feedback message -->
+              <div v-if="feedbackMessage" class="feedback-message">
+                {{ feedbackMessage }}
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section class="menu-section">
+          <h3 class="menu-title">Full Menu</h3>
+          <p class="menu-subtitle">Rate any dish to improve your future recommendations!</p>
+          <div class="menu-grid">
+            <div v-for="item in menuItems" :key="item.name" class="menu-item-card">
+              <h4 class="menu-item-name">{{ item.name }}</h4>
+              <p class="menu-item-description">{{ item.description }}</p>
+              <p class="menu-item-price">${{ item.price.toFixed(2) }}</p>
+
+              <!-- Star rating for menu items -->
+              <div class="menu-item-actions">
+                <div class="menu-star-rating">
+                  <button
+                    v-for="star in 6"
+                    :key="star - 1"
+                    @click="submitStarRating(item.name, star - 1)"
+                    :disabled="submittingFeedback"
+                    class="menu-star-btn"
+                    :title="`${star - 1} star${star - 1 !== 1 ? 's' : ''}`"
+                  >
+                    {{ star - 1 }}⭐
+                  </button>
+                </div>
+
+                <!-- Like/Dislike buttons -->
+                <div class="menu-preference-buttons">
+                  <button
+                    @click="addToLiked(item.name)"
+                    :disabled="submittingFeedback"
+                    class="menu-pref-btn like"
+                    title="Add to liked"
+                  >
+                    👍
+                  </button>
+                  <button
+                    @click="addToDisliked(item.name)"
+                    :disabled="submittingFeedback"
+                    class="menu-pref-btn dislike"
+                    title="Add to disliked"
+                  >
+                    👎
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </template>
     </main>
   </div>
 </template>
@@ -632,11 +655,88 @@ const addToDisliked = async (dishName: string) => {
   cursor: not-allowed;
 }
 
-.loading,
-.error {
+.loading {
   text-align: center;
   font-size: 1.2rem;
   color: #606c38;
   margin-top: 2rem;
+}
+
+.error-not-found,
+.error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  padding: 2rem;
+}
+
+.error-content {
+  text-align: center;
+  max-width: 500px;
+  background: white;
+  padding: 3rem;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.error-emoji {
+  font-size: 5rem;
+  margin-bottom: 1rem;
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.error-title {
+  font-size: 2rem;
+  color: #606c38;
+  margin-bottom: 1rem;
+  font-weight: 800;
+}
+
+.error-message {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.error-message strong {
+  color: #606c38;
+  font-weight: 700;
+}
+
+.error-suggestion {
+  font-size: 1rem;
+  color: #888;
+  margin-bottom: 2rem;
+  font-style: italic;
+}
+
+.error-button {
+  background: #606c38;
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.error-button:hover {
+  background: #99ac5d;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(96, 108, 56, 0.3);
 }
 </style>

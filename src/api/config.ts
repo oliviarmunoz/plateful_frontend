@@ -1,7 +1,11 @@
-import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
+import axios, { type AxiosInstance } from 'axios'
 
 // API Configuration
-export const API_BASE_URL = 'http://localhost:8000/api'
+// In development, use relative URL to leverage Vite proxy
+// In production, this should be set via environment variable
+export const API_BASE_URL = import.meta.env.PROD
+  ? import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+  : '/api'
 
 // Create axios instance with default configuration
 export const apiClient: AxiosInstance = axios.create({
@@ -30,6 +34,17 @@ apiClient.interceptors.request.use(
 // Response interceptor for handling common errors
 apiClient.interceptors.response.use(
   (response) => {
+    // Check if response contains an error property (even with 200 status)
+    if (response.data && typeof response.data === 'object' && 'error' in response.data) {
+      const errorMessage = response.data.error || 'An error occurred'
+      return Promise.reject({
+        response: {
+          data: { error: errorMessage, message: errorMessage },
+          status: response.status,
+        },
+        message: errorMessage,
+      })
+    }
     return response
   },
   (error) => {

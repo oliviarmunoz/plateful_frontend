@@ -30,9 +30,15 @@ const handleLogin = async () => {
     // Redirect to home page
     router.push('/')
   } catch (err: unknown) {
-    const apiErr = err as { response?: { data?: { message?: string } }; message?: string }
+    const apiErr = err as {
+      response?: { data?: { error?: string; message?: string } }
+      message?: string
+    }
     const message =
-      apiErr?.response?.data?.message || apiErr?.message || 'Login failed. Please try again.'
+      apiErr?.response?.data?.error ||
+      apiErr?.response?.data?.message ||
+      apiErr?.message ||
+      'Login failed. Please try again.'
     error.value = message
   } finally {
     loading.value = false
