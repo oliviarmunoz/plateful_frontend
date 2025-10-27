@@ -488,19 +488,28 @@ const addToDisliked = async (dishName: string) => {
 }
 
 .preference-btn.like-btn {
-  background: #22c55e;
+  background: #606c38;
+  border: 2px solid #4a5a2a;
+  box-shadow: 0 2px 4px rgba(96, 108, 56, 0.3);
 }
 
 .preference-btn.like-btn:hover:not(:disabled) {
-  background: #16a34a;
+  background: #4a5a2a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(96, 108, 56, 0.4);
 }
 
 .preference-btn.dislike-btn {
-  background: #ef4444;
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(96, 108, 56, 0.4);
+  color: #666;
+  border-style: dashed;
 }
 
 .preference-btn.dislike-btn:hover:not(:disabled) {
-  background: #dc2626;
+  background: rgba(255, 255, 255, 1);
+  border-style: solid;
+  color: #606c38;
 }
 
 .feedback-message {
@@ -641,13 +650,15 @@ const addToDisliked = async (dishName: string) => {
 }
 
 .menu-pref-btn.like:hover:not(:disabled) {
-  border-color: #22c55e;
-  background: rgba(34, 197, 94, 0.1);
+  border-color: #606c38;
+  background: rgba(96, 108, 56, 0.15);
+  border-width: 3px;
 }
 
 .menu-pref-btn.dislike:hover:not(:disabled) {
-  border-color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(96, 108, 56, 0.6);
+  background: rgba(255, 255, 255, 0.9);
+  border-style: dashed;
 }
 
 .menu-pref-btn:disabled {

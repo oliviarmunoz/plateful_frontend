@@ -202,78 +202,104 @@ onMounted(() => {
         <!-- Taste Preferences Section -->
         <section class="taste-preferences">
           <div class="preferences-header">
-            <h2>Your Taste Preferences</h2>
-            <p>Manage your liked and disliked dishes to improve recommendations</p>
+            <h2>Taste Preferences</h2>
+            <p>Dishes you've liked and disliked to personalize your recommendations</p>
           </div>
 
-          <!-- Liked Dishes -->
-          <div class="preferences-section">
-            <h3 class="section-title">
-              <span class="icon">👍</span>
-              Liked Dishes ({{ likedDishes.length }})
-            </h3>
-            <div v-if="likedDishes.length === 0" class="empty-state">
-              <p>No liked dishes yet. Start rating dishes to build your taste profile!</p>
-            </div>
-            <div v-else class="dish-list">
-              <div v-for="dish in likedDishes" :key="dish" class="dish-item liked">
-                <span class="dish-name">{{ dish }}</span>
-                <button
-                  @click="removeLikedDish(dish)"
-                  class="remove-button"
-                  title="Remove from liked dishes"
-                >
+          <div class="preferences-grid">
+            <!-- Liked Dishes Box -->
+            <div class="preference-box liked-box">
+              <div class="box-header">
+                <div class="box-icon">
                   <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
+                    width="24"
+                    height="24"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
                   >
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
+                    <path d="M7 10v12" />
+                    <path
+                      d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"
+                    />
                   </svg>
-                </button>
+                </div>
+                <h3 class="box-title">Liked Dishes</h3>
+                <span class="box-count">{{ likedDishes.length }}</span>
+              </div>
+              <div v-if="likedDishes.length === 0" class="empty-state">
+                <p>No liked dishes yet. Start rating dishes to build your taste profile!</p>
+              </div>
+              <div v-else class="dish-list">
+                <div v-for="dish in likedDishes" :key="dish" class="dish-item">
+                  <span class="dish-name">{{ dish }}</span>
+                  <button
+                    @click="removeLikedDish(dish)"
+                    class="remove-button"
+                    title="Remove from liked dishes"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Disliked Dishes -->
-          <div class="preferences-section">
-            <h3 class="section-title">
-              <span class="icon">👎</span>
-              Disliked Dishes ({{ dislikedDishes.length }})
-            </h3>
-            <div v-if="dislikedDishes.length === 0" class="empty-state">
-              <p>No disliked dishes yet. Start rating dishes to build your taste profile!</p>
-            </div>
-            <div v-else class="dish-list">
-              <div v-for="dish in dislikedDishes" :key="dish" class="dish-item disliked">
-                <span class="dish-name">{{ dish }}</span>
-                <button
-                  @click="removeDislikedDish(dish)"
-                  class="remove-button"
-                  title="Remove from disliked dishes"
-                >
+            <!-- Disliked Dishes Box -->
+            <div class="preference-box disliked-box">
+              <div class="box-header">
+                <div class="box-icon">
                   <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
+                    width="24"
+                    height="24"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
                   >
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
+                    <path d="M17 14V2" />
+                    <path
+                      d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"
+                    />
                   </svg>
-                </button>
+                </div>
+                <h3 class="box-title">Disliked Dishes</h3>
+                <span class="box-count">{{ dislikedDishes.length }}</span>
+              </div>
+              <div v-if="dislikedDishes.length === 0" class="empty-state">
+                <p>No disliked dishes yet. Start rating dishes to build your taste profile!</p>
+              </div>
+              <div v-else class="dish-list">
+                <div v-for="dish in dislikedDishes" :key="dish" class="dish-item">
+                  <span class="dish-name">{{ dish }}</span>
+                  <button
+                    @click="removeDislikedDish(dish)"
+                    class="remove-button"
+                    title="Remove from disliked dishes"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -544,15 +570,20 @@ onMounted(() => {
 }
 
 .dish-item.liked {
-  background: rgba(34, 197, 94, 0.2);
-  border-color: #22c55e;
-  color: #166534;
+  background: rgba(96, 108, 56, 0.15);
+  border-color: #606c38;
+  color: #4a5a2a;
+  border-width: 3px;
+  box-shadow: 0 2px 8px rgba(96, 108, 56, 0.2);
 }
 
 .dish-item.disliked {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: #ef4444;
-  color: #991b1b;
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(96, 108, 56, 0.3);
+  color: #666;
+  border-style: dashed;
+  border-width: 2px;
+  opacity: 0.7;
 }
 
 .dish-name {
@@ -574,5 +605,63 @@ onMounted(() => {
 .remove-button:hover {
   background: rgba(0, 0, 0, 0.1);
   opacity: 1;
+}
+
+/* New Box Layout Styles */
+.preferences-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.preference-box {
+  background: rgba(96, 108, 56, 0.3);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(96, 108, 56, 0.1);
+  border-radius: 20px;
+  padding: 2rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.preference-box:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(96, 108, 56, 0.15);
+}
+
+.box-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(96, 108, 56, 0.1);
+}
+
+.box-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(96, 108, 56, 0.1);
+  color: white;
+}
+
+.box-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: white;
+  margin: 0;
+  flex: 1;
+}
+
+.box-count {
+  background: #606c38;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 15px;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 </style>
