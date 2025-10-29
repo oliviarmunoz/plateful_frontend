@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { userTastePreferencesApi, type User, type ApiError } from '@/api'
+import { userTastePreferencesApi, feedbackApi, type User, type ApiError } from '@/api'
 
 const router = useRouter()
 const loading = ref(false)
@@ -9,6 +9,10 @@ const error = ref('')
 const user = ref<User | null>(null)
 const likedDishes = ref<string[]>([])
 const dislikedDishes = ref<string[]>([])
+const dishFeedback = ref<Record<string, number>>({})
+const submittingFeedback = ref(false)
+const feedbackMessage = ref('')
+const showingRatingControls = ref<Record<string, boolean>>({})
 
 // Get current user from localStorage
 const getCurrentUser = () => {
@@ -48,6 +52,12 @@ const loadUserData = async () => {
     } else {
       dislikedDishes.value = []
     }
+
+    // Fetch feedback for all dishes
+    const allDishes = [...likedDishes.value, ...dislikedDishes.value]
+    if (allDishes.length > 0) {
+      await fetchFeedbackForDishes(allDishes, userId)
+    }
   } catch (err: unknown) {
     const apiError = err as ApiError
     error.value = apiError.response?.data?.message || 'Failed to load user data'
@@ -76,6 +86,84 @@ const removeDislikedDish = async (dish: string) => {
   }
 }
 
+const fetchFeedbackForDishes = async (dishes: string[], userId: string) => {
+  console.log('Fetching feedback for dishes:', dishes, 'userId:', userId)
+
+  const feedbackPromises = dishes.map(async (dish) => {
+    try {
+      const response = await feedbackApi.getFeedback({
+        author: userId,
+        item: dish,
+      })
+      console.log(`Feedback response for ${dish}:`, response)
+
+      // The response might be wrapped in ApiResponse structure
+      let feedbackData = response
+      if (response && typeof response === 'object' && 'data' in response) {
+        feedbackData = response.data
+      }
+
+      console.log(`Feedback data for ${dish}:`, feedbackData)
+
+      if (
+        feedbackData &&
+        Array.isArray(feedbackData) &&
+        feedbackData.length > 0 &&
+        feedbackData[0].feedback
+      ) {
+        // Parse the feedback object to extract the rating
+        const feedbackObj = feedbackData[0].feedback
+        console.log(`Feedback object for ${dish}:`, feedbackObj)
+
+        // Try different parsing approaches
+        let rating = null
+
+        // Method 1: Check if feedback is an object with a rating property
+        if (typeof feedbackObj === 'object' && feedbackObj !== null) {
+          if ('rating' in feedbackObj) {
+            rating = parseFloat(feedbackObj.rating)
+          } else if ('value' in feedbackObj) {
+            rating = parseFloat(feedbackObj.value)
+          } else if ('score' in feedbackObj) {
+            rating = parseFloat(feedbackObj.score)
+          }
+        }
+
+        // Method 2: If feedback is a string, try to parse it
+        if (rating === null && typeof feedbackObj === 'string') {
+          const ratingMatch = feedbackObj.match(/rating[:\s]*(\d+(?:\.\d+)?)/i)
+          if (ratingMatch) {
+            rating = parseFloat(ratingMatch[1])
+          } else {
+            const numberMatch = feedbackObj.match(/(\d+(?:\.\d+)?)/)
+            if (numberMatch) {
+              rating = parseFloat(numberMatch[1])
+            }
+          }
+        }
+
+        console.log(`Parsed rating for ${dish}:`, rating)
+        return { dish, rating }
+      }
+      return { dish, rating: null }
+    } catch (error) {
+      console.log(`Error fetching feedback for ${dish}:`, error)
+      return { dish, rating: null }
+    }
+  })
+
+  const results = await Promise.all(feedbackPromises)
+  console.log('All feedback results:', results)
+
+  results.forEach(({ dish, rating }) => {
+    if (rating !== null) {
+      dishFeedback.value[dish] = rating
+    }
+  })
+
+  console.log('Final dishFeedback object:', dishFeedback.value)
+}
+
 const logout = () => {
   localStorage.removeItem('auth_token')
   localStorage.removeItem('user')
@@ -87,6 +175,97 @@ const goHome = () => {
 }
 
 const totalPreferences = computed(() => likedDishes.value.length + dislikedDishes.value.length)
+
+const getStarRating = (rating: number) => {
+  const fullStars = Math.floor(rating)
+  const hasHalfStar = rating % 1 >= 0.5
+  const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0)
+
+  return {
+    fullStars,
+    hasHalfStar,
+    emptyStars,
+  }
+}
+
+const submitStarRating = async (dishName: string, rating: number) => {
+  if (!user.value?.id) {
+    router.push('/login')
+    return
+  }
+
+  // Prevent multiple simultaneous submissions
+  if (submittingFeedback.value) {
+    return
+  }
+
+  try {
+    submittingFeedback.value = true
+    feedbackMessage.value = ''
+
+    const userId = user.value.id.toString()
+
+    // Store the original state for potential rollback
+    const originalRating = dishFeedback.value[dishName]
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const originalControlsVisible = showingRatingControls.value[dishName] || false
+
+    // Update UI state optimistically but keep controls visible during submission
+    dishFeedback.value[dishName] = rating
+
+    // Check if feedback already exists for this dish
+    const existingFeedback = originalRating !== undefined
+
+    if (existingFeedback) {
+      // Update existing feedback
+      await feedbackApi.updateFeedback({
+        author: userId,
+        item: dishName,
+        newRating: rating,
+      })
+
+      feedbackMessage.value = `✓ Updated "${dishName}" to ${rating} star${rating !== 1 ? 's' : ''}!`
+    } else {
+      // Submit new feedback
+      await feedbackApi.submitFeedback({
+        author: userId,
+        item: dishName,
+        rating: rating,
+      })
+
+      feedbackMessage.value = `✓ Rated "${dishName}" ${rating} star${rating !== 1 ? 's' : ''}!`
+    }
+
+    // Hide rating controls only after successful API call
+    showingRatingControls.value[dishName] = false
+
+    // Clear feedback message after delay
+    setTimeout(() => {
+      feedbackMessage.value = ''
+    }, 3000)
+  } catch (err: unknown) {
+    console.error('Error in submitStarRating:', err)
+
+    // Revert the optimistic update on error
+    if (originalRating !== undefined) {
+      dishFeedback.value[dishName] = originalRating
+    } else {
+      delete dishFeedback.value[dishName]
+    }
+
+    // Restore original controls visibility
+    showingRatingControls.value[dishName] = originalControlsVisible
+
+    const apiErr = err as { response?: { data?: { error?: string } } }
+    feedbackMessage.value = `Error: ${apiErr?.response?.data?.error || 'Failed to submit rating'}`
+  } finally {
+    submittingFeedback.value = false
+  }
+}
+
+const toggleRatingControls = (dishName: string) => {
+  showingRatingControls.value[dishName] = !showingRatingControls.value[dishName]
+}
 
 onMounted(() => {
   loadUserData()
@@ -158,10 +337,14 @@ onMounted(() => {
         <button @click="loadUserData" class="retry-button">Try Again</button>
       </div>
 
+      <!-- Feedback message -->
+      <div v-if="feedbackMessage" class="feedback-message">
+        {{ feedbackMessage }}
+      </div>
+
       <!-- Profile content -->
-      <div v-else-if="user" class="profile-content">
+      <div v-if="user" class="profile-content">
         <!-- User Info Section -->
-        <p>{{ message }}</p>
         <section class="user-info">
           <div class="user-avatar">
             <svg
@@ -233,7 +416,77 @@ onMounted(() => {
               </div>
               <div v-else class="dish-list">
                 <div v-for="dish in likedDishes" :key="dish" class="dish-item">
-                  <span class="dish-name">{{ dish }}</span>
+                  <div class="dish-info">
+                    <span class="dish-name">{{ dish }}</span>
+                    <div class="feedback-section">
+                      <!-- Display current rating if exists -->
+                      <div
+                        v-if="dishFeedback[dish] !== undefined && dishFeedback[dish] !== null"
+                        class="current-rating"
+                      >
+                        <div class="star-rating-display">
+                          <span
+                            v-for="i in getStarRating(dishFeedback[dish]).fullStars"
+                            :key="`full-${i}`"
+                            class="star full"
+                            >★</span
+                          >
+                          <span
+                            v-if="getStarRating(dishFeedback[dish]).hasHalfStar"
+                            class="star half"
+                            >★</span
+                          >
+                          <span
+                            v-for="i in getStarRating(dishFeedback[dish]).emptyStars"
+                            :key="`empty-${i}`"
+                            class="star empty"
+                            >☆</span
+                          >
+                        </div>
+                        <span class="rating-text">{{ dishFeedback[dish] }}/5</span>
+                      </div>
+
+                      <!-- Rating toggle button -->
+                      <div class="rating-toggle">
+                        <button
+                          @click="toggleRatingControls(dish)"
+                          class="toggle-btn"
+                          :disabled="submittingFeedback"
+                        >
+                          <span v-if="submittingFeedback">⏳</span>
+                          <span v-else>{{
+                            showingRatingControls[dish] ? 'Hide Rating' : 'Rate/Update'
+                          }}</span>
+                        </button>
+                      </div>
+
+                      <!-- Interactive star rating buttons (hidden by default) -->
+                      <div v-show="showingRatingControls[dish]" class="rating-controls">
+                        <p class="rating-label">
+                          {{
+                            dishFeedback[dish] !== undefined ? 'Update rating:' : 'Rate this dish:'
+                          }}
+                        </p>
+                        <div class="star-buttons">
+                          <button
+                            v-for="star in 6"
+                            :key="star - 1"
+                            @click="submitStarRating(dish, star - 1)"
+                            :disabled="submittingFeedback"
+                            class="star-btn"
+                            :class="{
+                              active: dishFeedback[dish] === star - 1,
+                              loading: submittingFeedback,
+                            }"
+                            :title="`${star - 1} star${star - 1 !== 1 ? 's' : ''}`"
+                          >
+                            <span v-if="submittingFeedback" class="loading-spinner-small">⏳</span>
+                            <span v-else>{{ star - 1 }}⭐</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <button
                     @click="removeLikedDish(dish)"
                     class="remove-button"
@@ -281,7 +534,77 @@ onMounted(() => {
               </div>
               <div v-else class="dish-list">
                 <div v-for="dish in dislikedDishes" :key="dish" class="dish-item">
-                  <span class="dish-name">{{ dish }}</span>
+                  <div class="dish-info">
+                    <span class="dish-name">{{ dish }}</span>
+                    <div class="feedback-section">
+                      <!-- Display current rating if exists -->
+                      <div
+                        v-if="dishFeedback[dish] !== undefined && dishFeedback[dish] !== null"
+                        class="current-rating"
+                      >
+                        <div class="star-rating-display">
+                          <span
+                            v-for="i in getStarRating(dishFeedback[dish]).fullStars"
+                            :key="`full-${i}`"
+                            class="star full"
+                            >★</span
+                          >
+                          <span
+                            v-if="getStarRating(dishFeedback[dish]).hasHalfStar"
+                            class="star half"
+                            >★</span
+                          >
+                          <span
+                            v-for="i in getStarRating(dishFeedback[dish]).emptyStars"
+                            :key="`empty-${i}`"
+                            class="star empty"
+                            >☆</span
+                          >
+                        </div>
+                        <span class="rating-text">{{ dishFeedback[dish] }}/5</span>
+                      </div>
+
+                      <!-- Rating toggle button -->
+                      <div class="rating-toggle">
+                        <button
+                          @click="toggleRatingControls(dish)"
+                          class="toggle-btn"
+                          :disabled="submittingFeedback"
+                        >
+                          <span v-if="submittingFeedback">⏳</span>
+                          <span v-else>{{
+                            showingRatingControls[dish] ? 'Hide Rating' : 'Rate/Update'
+                          }}</span>
+                        </button>
+                      </div>
+
+                      <!-- Interactive star rating buttons (hidden by default) -->
+                      <div v-show="showingRatingControls[dish]" class="rating-controls">
+                        <p class="rating-label">
+                          {{
+                            dishFeedback[dish] !== undefined ? 'Update rating:' : 'Rate this dish:'
+                          }}
+                        </p>
+                        <div class="star-buttons">
+                          <button
+                            v-for="star in 6"
+                            :key="star - 1"
+                            @click="submitStarRating(dish, star - 1)"
+                            :disabled="submittingFeedback"
+                            class="star-btn"
+                            :class="{
+                              active: dishFeedback[dish] === star - 1,
+                              loading: submittingFeedback,
+                            }"
+                            :title="`${star - 1} star${star - 1 !== 1 ? 's' : ''}`"
+                          >
+                            <span v-if="submittingFeedback" class="loading-spinner-small">⏳</span>
+                            <span v-else>{{ star - 1 }}⭐</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <button
                     @click="removeDislikedDish(dish)"
                     class="remove-button"
@@ -321,7 +644,6 @@ onMounted(() => {
 
 .header {
   padding: 1rem 0;
-  justify-content: flex-end;
 }
 
 .nav-container {
@@ -522,28 +844,6 @@ onMounted(() => {
   font-size: 1rem;
 }
 
-.preferences-section {
-  margin-bottom: 2rem;
-}
-
-.preferences-section:last-child {
-  margin-bottom: 0;
-}
-
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1.3rem;
-  font-weight: 600;
-  color: white;
-  margin-bottom: 1rem;
-}
-
-.icon {
-  font-size: 1.2rem;
-}
-
 .empty-state {
   text-align: center;
   padding: 2rem;
@@ -567,6 +867,7 @@ onMounted(() => {
   border-radius: 8px;
   border: 2px solid;
   transition: all 0.3s ease;
+  border-style: solid;
 }
 
 .dish-item.liked {
@@ -581,13 +882,13 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.8);
   border-color: rgba(96, 108, 56, 0.3);
   color: #666;
-  border-style: dashed;
   border-width: 2px;
   opacity: 0.7;
 }
 
 .dish-name {
   font-weight: 500;
+  color: white;
   flex: 1;
 }
 
@@ -598,8 +899,7 @@ onMounted(() => {
   cursor: pointer;
   padding: 0.25rem;
   border-radius: 4px;
-  transition: background 0.3s ease;
-  opacity: 0.7;
+  transition: all 0.2s ease;
 }
 
 .remove-button:hover {
@@ -663,5 +963,178 @@ onMounted(() => {
   border-radius: 15px;
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+/* Feedback Display Styles */
+.dish-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.feedback-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.star-rating {
+  display: flex;
+  gap: 0.1rem;
+}
+
+.star {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.star.full {
+  color: #fbbf24;
+}
+
+.star.half {
+  color: #fbbf24;
+  opacity: 0.6;
+}
+
+.star.empty {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.rating-text {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+}
+
+/* Feedback Message */
+.feedback-message {
+  background: #606c38;
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  text-align: center;
+  margin-bottom: 2rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(96, 108, 56, 0.2);
+}
+
+/* Feedback Section Styles */
+.feedback-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.current-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.star-rating-display {
+  display: flex;
+  gap: 0.1rem;
+}
+
+.rating-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rating-label {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  font-weight: 500;
+}
+
+.star-buttons {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.star-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 2rem;
+  text-align: center;
+}
+
+.star-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.star-btn.active {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.6);
+  color: white;
+  font-weight: 600;
+}
+
+.star-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.star-btn.loading {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.loading-spinner-small {
+  display: inline-block;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Toggle Button Styles */
+.rating-toggle {
+  margin-top: 0.5rem;
+}
+
+.toggle-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

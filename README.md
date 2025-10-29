@@ -1,7 +1,7 @@
 # Front-end Repo for Plateful
 
 - [User Journey](/assignment-checkin/userJourney.md)
-- [Recording](/assignment-checkin/e2e_Recording.mov)
+- [Recording](/assignment-checkin/screen-recording.mov)
 - [Visual Design Study](/assignment-checkin/visual-design-study.md)
 
 ## Application Pitch

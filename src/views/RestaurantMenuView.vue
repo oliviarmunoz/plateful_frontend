@@ -85,7 +85,7 @@ const submitStarRating = async (dishName: string, rating: number) => {
 
     const userId = user.value.id.toString()
 
-    // Submit feedback (0-5 rating)
+    // Submit feedback or update existing feedback
     await feedbackApi.submitFeedback({
       author: userId,
       item: dishName,
@@ -494,16 +494,15 @@ const addToDisliked = async (dishName: string) => {
 }
 
 .preference-btn.like-btn:hover:not(:disabled) {
-  background: #4a5a2a;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(96, 108, 56, 0.4);
+  background: rgba(255, 255, 255, 1);
+  border-style: solid;
+  color: #606c38;
 }
 
 .preference-btn.dislike-btn {
-  background: rgba(255, 255, 255, 0.9);
-  border: 2px solid rgba(96, 108, 56, 0.4);
-  color: #666;
-  border-style: dashed;
+  background: #606c38;
+  border: 2px solid #4a5a2a;
+  box-shadow: 0 2px 4px rgba(96, 108, 56, 0.3);
 }
 
 .preference-btn.dislike-btn:hover:not(:disabled) {
@@ -658,7 +657,6 @@ const addToDisliked = async (dishName: string) => {
 .menu-pref-btn.dislike:hover:not(:disabled) {
   border-color: rgba(96, 108, 56, 0.6);
   background: rgba(255, 255, 255, 0.9);
-  border-style: dashed;
 }
 
 .menu-pref-btn:disabled {

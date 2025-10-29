@@ -1,4 +1,3 @@
-
 # API Specification: Feedback Concept
 
 **Purpose:** provide quantitative (0-5) feedback about a specific item
@@ -12,13 +11,16 @@
 **Description:** Creates a new feedback entry, associating an author, item, and a quantitative rating.
 
 **Requirements:**
+
 - item doesn't already have feedback from this user
 - rating is between 0-5
 
 **Effects:**
+
 - creates a new Feedback, associating the author, target, and rating
 
 **Request Body:**
+
 ```json
 {
   "author": "User",
@@ -28,6 +30,7 @@
 ```
 
 **Success Response Body (Action):**
+
 ```json
 {
   "feedback": "Feedback"
@@ -35,6 +38,7 @@
 ```
 
 **Error Response Body:**
+
 ```json
 {
   "error": "string"
@@ -48,13 +52,16 @@
 **Description:** Updates the rating of an existing feedback entry for a specific item by a given user.
 
 **Requirements:**
+
 - feedback for this item from this user exists
 - newRating is between 0-5
 
 **Effects:**
+
 - updates the rating of the specified item to newRating
 
 **Request Body:**
+
 ```json
 {
   "author": "User",
@@ -64,6 +71,7 @@
 ```
 
 **Success Response Body (Action):**
+
 ```json
 {
   "feedback": "Feedback"
@@ -71,6 +79,7 @@
 ```
 
 **Error Response Body:**
+
 ```json
 {
   "error": "string"
@@ -84,12 +93,15 @@
 **Description:** Removes an existing feedback entry for a specific item from a given user.
 
 **Requirements:**
+
 - feedback for this item from this user exists
 
 **Effects:**
+
 - returns True if the feedback from this user for this item is removed
 
 **Request Body:**
+
 ```json
 {
   "author": "User",
@@ -98,6 +110,7 @@
 ```
 
 **Success Response Body (Action):**
+
 ```json
 {
   "successful": "Boolean"
@@ -105,6 +118,7 @@
 ```
 
 **Error Response Body:**
+
 ```json
 {
   "error": "string"
@@ -113,17 +127,20 @@
 
 ---
 
-### POST /api/Feedback/_getFeedback
+### POST /api/Feedback/\_getFeedback
 
 **Description:** Retrieves a specific feedback entry given an author and an item.
 
 **Requirements:**
+
 - feedback for this item from this user exists
 
 **Effects:**
+
 - returns the feedback from this user for this item
 
 **Request Body:**
+
 ```json
 {
   "author": "User",
@@ -132,6 +149,7 @@
 ```
 
 **Success Response Body (Query):**
+
 ```json
 [
   {
@@ -141,6 +159,7 @@
 ```
 
 **Error Response Body:**
+
 ```json
 {
   "error": "string"
