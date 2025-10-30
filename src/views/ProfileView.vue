@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { userTastePreferencesApi, feedbackApi, type User, type ApiError } from '@/api'
+import { userTastePreferencesApi, feedbackApi, type User } from '@/api'
 
 const router = useRouter()
 const loading = ref(false)
@@ -59,8 +59,8 @@ const loadUserData = async () => {
       await fetchFeedbackForDishes(allDishes, userId)
     }
   } catch (err: unknown) {
-    const apiError = err as ApiError
-    error.value = apiError.response?.data?.message || 'Failed to load user data'
+    const apiError = err as any
+    error.value = apiError?.response?.data?.message || 'Failed to load user data'
   } finally {
     loading.value = false
   }
@@ -71,8 +71,8 @@ const removeLikedDish = async (dish: string) => {
     await userTastePreferencesApi.removeLikedDish(user.value!.id.toString(), dish)
     likedDishes.value = likedDishes.value.filter((d) => d !== dish)
   } catch (err: unknown) {
-    const apiError = err as ApiError
-    error.value = apiError.response?.data?.message || 'Failed to remove liked dish'
+    const apiError = err as any
+    error.value = apiError?.response?.data?.message || 'Failed to remove liked dish'
   }
 }
 
@@ -81,8 +81,8 @@ const removeDislikedDish = async (dish: string) => {
     await userTastePreferencesApi.removeDislikedDish(user.value!.id.toString(), dish)
     dislikedDishes.value = dislikedDishes.value.filter((d) => d !== dish)
   } catch (err: unknown) {
-    const apiError = err as ApiError
-    error.value = apiError.response?.data?.message || 'Failed to remove disliked dish'
+    const apiError = err as any
+    error.value = apiError?.response?.data?.message || 'Failed to remove disliked dish'
   }
 }
 
@@ -97,22 +97,16 @@ const fetchFeedbackForDishes = async (dishes: string[], userId: string) => {
       })
       console.log(`Feedback response for ${dish}:`, response)
 
-      // The response might be wrapped in ApiResponse structure
-      let feedbackData = response
-      if (response && typeof response === 'object' && 'data' in response) {
-        feedbackData = response.data
-      }
-
+      const feedbackData = response?.data
       console.log(`Feedback data for ${dish}:`, feedbackData)
 
-      if (
-        feedbackData &&
-        Array.isArray(feedbackData) &&
-        feedbackData.length > 0 &&
-        feedbackData[0].feedback
-      ) {
+      if (feedbackData && Array.isArray(feedbackData) && feedbackData.length > 0) {
+        const firstFeedback = feedbackData[0] as any
+        if (!firstFeedback || !firstFeedback.feedback) {
+          return { dish, rating: null }
+        }
         // Parse the feedback object to extract the rating
-        const feedbackObj = feedbackData[0].feedback
+        const feedbackObj = firstFeedback.feedback
         console.log(`Feedback object for ${dish}:`, feedbackObj)
 
         // Try different parsing approaches
@@ -120,12 +114,13 @@ const fetchFeedbackForDishes = async (dishes: string[], userId: string) => {
 
         // Method 1: Check if feedback is an object with a rating property
         if (typeof feedbackObj === 'object' && feedbackObj !== null) {
-          if ('rating' in feedbackObj) {
-            rating = parseFloat(feedbackObj.rating)
-          } else if ('value' in feedbackObj) {
-            rating = parseFloat(feedbackObj.value)
-          } else if ('score' in feedbackObj) {
-            rating = parseFloat(feedbackObj.score)
+          const anyObj = feedbackObj as Record<string, unknown>
+          if ('rating' in anyObj) {
+            rating = Number((anyObj as any).rating)
+          } else if ('value' in anyObj) {
+            rating = Number((anyObj as any).value)
+          } else if ('score' in anyObj) {
+            rating = Number((anyObj as any).score)
           }
         }
 
@@ -133,11 +128,11 @@ const fetchFeedbackForDishes = async (dishes: string[], userId: string) => {
         if (rating === null && typeof feedbackObj === 'string') {
           const ratingMatch = feedbackObj.match(/rating[:\s]*(\d+(?:\.\d+)?)/i)
           if (ratingMatch) {
-            rating = parseFloat(ratingMatch[1])
+            rating = Number(ratingMatch[1] ?? '')
           } else {
             const numberMatch = feedbackObj.match(/(\d+(?:\.\d+)?)/)
             if (numberMatch) {
-              rating = parseFloat(numberMatch[1])
+              rating = Number(numberMatch[1] ?? '')
             }
           }
         }
@@ -188,6 +183,9 @@ const getStarRating = (rating: number) => {
   }
 }
 
+let originalRating: number | undefined
+let originalControlsVisible = false
+
 const submitStarRating = async (dishName: string, rating: number) => {
   if (!user.value?.id) {
     router.push('/login')
@@ -206,9 +204,8 @@ const submitStarRating = async (dishName: string, rating: number) => {
     const userId = user.value.id.toString()
 
     // Store the original state for potential rollback
-    const originalRating = dishFeedback.value[dishName]
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const originalControlsVisible = showingRatingControls.value[dishName] || false
+    originalRating = dishFeedback.value[dishName]
+    originalControlsVisible = showingRatingControls.value[dishName] || false
 
     // Update UI state optimistically but keep controls visible during submission
     dishFeedback.value[dishName] = rating
@@ -275,7 +272,7 @@ onMounted(() => {
 <template>
   <div class="profile-page">
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
     <link
       href="https://fonts.googleapis.com/css2?family=BBH+Sans+Bartle&family=Montserrat:wght@800&family=Schibsted+Grotesk:ital,wght@0,400..900;1,400..900&display=swap"
       rel="stylesheet"

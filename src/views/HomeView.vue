@@ -111,8 +111,13 @@ const handleKeyDown = (event: KeyboardEvent) => {
       break
     case 'Enter':
       event.preventDefault()
-      if (selectedIndex.value >= 0 && filteredRestaurants.value[selectedIndex.value]) {
-        selectRestaurant(filteredRestaurants.value[selectedIndex.value])
+      if (selectedIndex.value >= 0) {
+        const selected = filteredRestaurants.value[selectedIndex.value]
+        if (typeof selected === 'string') {
+          selectRestaurant(selected)
+        } else {
+          handleSearch()
+        }
       } else {
         handleSearch()
       }
