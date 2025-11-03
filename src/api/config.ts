@@ -46,15 +46,6 @@ apiClient.interceptors.response.use(
     return response
   },
   (error) => {
-    // Debug logging for feedback and user taste preferences endpoint errors
-    if (error.config?.url?.includes('/Feedback/') || error.config?.url?.includes('/UserTastePreferences/')) {
-      console.log('API Error:', {
-        url: error.config.url,
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      })
-    }
     if (error.response?.status === 401) {
       // Handle unauthorized access
       localStorage.removeItem('auth_token')
