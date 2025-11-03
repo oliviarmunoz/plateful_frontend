@@ -42,13 +42,17 @@ const loadUserData = async () => {
     ])
 
     if (Array.isArray(likedResponse) && likedResponse.length > 0) {
-      likedDishes.value = likedResponse.map((item) => item.dishes).filter((dish) => dish)
+      likedDishes.value = likedResponse
+        .flatMap((item) => item.dishes)
+        .filter((dish) => dish && dish.trim() !== '')
     } else {
       likedDishes.value = []
     }
 
     if (Array.isArray(dislikedResponse) && dislikedResponse.length > 0) {
-      dislikedDishes.value = dislikedResponse.map((item) => item.dishes).filter((dish) => dish)
+      dislikedDishes.value = dislikedResponse
+        .flatMap((item) => item.dishes)
+        .filter((dish) => dish && dish.trim() !== '')
     } else {
       dislikedDishes.value = []
     }
@@ -59,55 +63,111 @@ const loadUserData = async () => {
       await fetchFeedbackForDishes(allDishes, userId)
     }
   } catch (err: unknown) {
-    const apiError = err as any
-    error.value = apiError?.response?.data?.message || 'Failed to load user data'
+    const apiError = err as {
+      response?: { data?: { error?: string; message?: string } }
+      message?: string
+    }
+    error.value =
+      apiError?.response?.data?.error ||
+      apiError?.response?.data?.message ||
+      apiError?.message ||
+      'Failed to load user data'
   } finally {
     loading.value = false
   }
 }
 
-const removeLikedDish = async (dish: string) => {
+const removeLikedDish = async (dishId: string) => {
+  if (!user.value?.id) {
+    error.value = 'User not logged in'
+    return
+  }
+  const trimmedDishId = dishId?.trim() || ''
+  if (!trimmedDishId) {
+    error.value = 'Invalid dish ID'
+    return
+  }
+
+  const userId = user.value.id.toString().trim()
+  if (!userId) {
+    error.value = 'User ID is required'
+    return
+  }
+
   try {
-    await userTastePreferencesApi.removeLikedDish(user.value!.id.toString(), dish)
-    likedDishes.value = likedDishes.value.filter((d) => d !== dish)
+    console.log('Removing liked dish:', { userId, dishId: trimmedDishId })
+    await userTastePreferencesApi.removeLikedDish(userId, trimmedDishId)
+    likedDishes.value = likedDishes.value.filter((d) => d !== dishId)
+    error.value = '' // Clear any previous errors on success
   } catch (err: unknown) {
-    const apiError = err as any
-    error.value = apiError?.response?.data?.message || 'Failed to remove liked dish'
+    const apiError = err as {
+      response?: { data?: { error?: string; message?: string } }
+      message?: string
+    }
+    error.value =
+      apiError?.response?.data?.error ||
+      apiError?.response?.data?.message ||
+      apiError?.message ||
+      'Failed to remove liked dish'
+    console.error('Error removing liked dish:', err)
+    console.error('Error details:', { userId, dishId: trimmedDishId, error: apiError })
   }
 }
 
-const removeDislikedDish = async (dish: string) => {
+const removeDislikedDish = async (dishId: string) => {
+  if (!user.value?.id) {
+    error.value = 'User not logged in'
+    return
+  }
+  const trimmedDishId = dishId?.trim() || ''
+  if (!trimmedDishId) {
+    error.value = 'Invalid dish ID'
+    return
+  }
+
+  const userId = user.value.id.toString().trim()
+  if (!userId) {
+    error.value = 'User ID is required'
+    return
+  }
+
   try {
-    await userTastePreferencesApi.removeDislikedDish(user.value!.id.toString(), dish)
-    dislikedDishes.value = dislikedDishes.value.filter((d) => d !== dish)
+    console.log('Removing disliked dish:', { userId, dishId: trimmedDishId })
+    await userTastePreferencesApi.removeDislikedDish(userId, trimmedDishId)
+    dislikedDishes.value = dislikedDishes.value.filter((d) => d !== dishId)
+    error.value = '' // Clear any previous errors on success
   } catch (err: unknown) {
-    const apiError = err as any
-    error.value = apiError?.response?.data?.message || 'Failed to remove disliked dish'
+    const apiError = err as {
+      response?: { data?: { error?: string; message?: string } }
+      message?: string
+    }
+    error.value =
+      apiError?.response?.data?.error ||
+      apiError?.response?.data?.message ||
+      apiError?.message ||
+      'Failed to remove disliked dish'
+    console.error('Error removing disliked dish:', err)
+    console.error('Error details:', { userId, dishId: trimmedDishId, error: apiError })
   }
 }
 
 const fetchFeedbackForDishes = async (dishes: string[], userId: string) => {
-  console.log('Fetching feedback for dishes:', dishes, 'userId:', userId)
-
   const feedbackPromises = dishes.map(async (dish) => {
     try {
       const response = await feedbackApi.getFeedback({
         author: userId,
         item: dish,
       })
-      console.log(`Feedback response for ${dish}:`, response)
 
       const feedbackData = response?.data
-      console.log(`Feedback data for ${dish}:`, feedbackData)
 
       if (feedbackData && Array.isArray(feedbackData) && feedbackData.length > 0) {
-        const firstFeedback = feedbackData[0] as any
+        const firstFeedback = feedbackData[0] as { feedback?: unknown }
         if (!firstFeedback || !firstFeedback.feedback) {
           return { dish, rating: null }
         }
         // Parse the feedback object to extract the rating
         const feedbackObj = firstFeedback.feedback
-        console.log(`Feedback object for ${dish}:`, feedbackObj)
 
         // Try different parsing approaches
         let rating = null
@@ -116,11 +176,11 @@ const fetchFeedbackForDishes = async (dishes: string[], userId: string) => {
         if (typeof feedbackObj === 'object' && feedbackObj !== null) {
           const anyObj = feedbackObj as Record<string, unknown>
           if ('rating' in anyObj) {
-            rating = Number((anyObj as any).rating)
+            rating = Number(anyObj.rating)
           } else if ('value' in anyObj) {
-            rating = Number((anyObj as any).value)
+            rating = Number(anyObj.value)
           } else if ('score' in anyObj) {
-            rating = Number((anyObj as any).score)
+            rating = Number(anyObj.score)
           }
         }
 
@@ -137,26 +197,21 @@ const fetchFeedbackForDishes = async (dishes: string[], userId: string) => {
           }
         }
 
-        console.log(`Parsed rating for ${dish}:`, rating)
         return { dish, rating }
       }
       return { dish, rating: null }
-    } catch (error) {
-      console.log(`Error fetching feedback for ${dish}:`, error)
+    } catch {
       return { dish, rating: null }
     }
   })
 
   const results = await Promise.all(feedbackPromises)
-  console.log('All feedback results:', results)
 
   results.forEach(({ dish, rating }) => {
     if (rating !== null) {
       dishFeedback.value[dish] = rating
     }
   })
-
-  console.log('Final dishFeedback object:', dishFeedback.value)
 }
 
 const logout = () => {

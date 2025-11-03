@@ -22,6 +22,14 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    // Debug logging for feedback and user taste preferences endpoints
+    if (config.url?.includes('/Feedback/') || config.url?.includes('/UserTastePreferences/')) {
+      console.log('API Request:', {
+        url: config.url,
+        method: config.method,
+        data: config.data,
+      })
+    }
     return config
   },
   (error) => {
@@ -32,6 +40,14 @@ apiClient.interceptors.request.use(
 // Response interceptor for handling common errors
 apiClient.interceptors.response.use(
   (response) => {
+    // Debug logging for feedback and user taste preferences endpoints
+    if (response.config.url?.includes('/Feedback/') || response.config.url?.includes('/UserTastePreferences/')) {
+      console.log('API Response:', {
+        url: response.config.url,
+        status: response.status,
+        data: response.data,
+      })
+    }
     // Check if response contains an error property (even with 200 status)
     if (response.data && typeof response.data === 'object' && 'error' in response.data) {
       const errorMessage = response.data.error || 'An error occurred'
@@ -46,6 +62,15 @@ apiClient.interceptors.response.use(
     return response
   },
   (error) => {
+    // Debug logging for feedback and user taste preferences endpoint errors
+    if (error.config?.url?.includes('/Feedback/') || error.config?.url?.includes('/UserTastePreferences/')) {
+      console.log('API Error:', {
+        url: error.config.url,
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      })
+    }
     if (error.response?.status === 401) {
       // Handle unauthorized access
       localStorage.removeItem('auth_token')

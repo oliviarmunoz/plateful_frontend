@@ -13,6 +13,7 @@ export const feedbackApi = {
     rating: number
   }): Promise<ApiResponse<{ feedback: string }>> {
     const response = await apiClient.post('/Feedback/submitFeedback', {
+      path: '/Feedback/submitFeedback',
       author,
       item,
       rating,
@@ -31,6 +32,8 @@ export const feedbackApi = {
     newRating: number
   }): Promise<ApiResponse<{ feedback: string }>> {
     const response = await apiClient.post('/Feedback/updateFeedback', {
+      path: '/Feedback/updateFeedback',
+      request: {},
       author,
       item,
       newRating,
@@ -47,6 +50,8 @@ export const feedbackApi = {
     item: string
   }): Promise<ApiResponse<{ successful: boolean }>> {
     const response = await apiClient.post('/Feedback/deleteFeedback', {
+      path: '/Feedback/deleteFeedback',
+      request: {},
       author,
       item,
     })
@@ -62,6 +67,8 @@ export const feedbackApi = {
     item: string
   }): Promise<ApiResponse<{ feedback: string }[]>> {
     const response = await apiClient.post('/Feedback/_getFeedback', {
+      path: '/Feedback/_getFeedback',
+      request: {},
       author,
       item,
     })

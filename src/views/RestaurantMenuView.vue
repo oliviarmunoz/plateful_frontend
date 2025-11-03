@@ -7,7 +7,7 @@ const route = useRoute()
 const router = useRouter()
 const restaurantName = decodeURIComponent(route.params.name as string)
 
-const menuItems = ref<{ name: string; description: string; price: number }[]>([])
+const menuItems = ref<{ menuItem: string; name: string; description: string; price: number }[]>([])
 const recommendation = ref('')
 const loading = ref(true)
 const error = ref('')
@@ -42,7 +42,7 @@ onMounted(async () => {
       // restaurant not found
       error.value = 'RESTAURANT_NOT_FOUND'
     } else if (Array.isArray(menuResponse)) {
-      menuItems.value = menuResponse as { name: string; description: string; price: number }[]
+      menuItems.value = menuResponse as { menuItem: string; name: string; description: string; price: number }[]
     }
 
     // Fetch recommendation
@@ -73,7 +73,7 @@ const goHome = () => {
   router.push('/')
 }
 
-const submitStarRating = async (dishName: string, rating: number) => {
+const submitStarRating = async (dishName: string, rating: number, menuItemId?: string) => {
   if (!user.value?.id) {
     router.push('/login')
     return
@@ -84,11 +84,12 @@ const submitStarRating = async (dishName: string, rating: number) => {
     feedbackMessage.value = ''
 
     const userId = user.value.id.toString()
+    const itemId = menuItemId || dishName // Use menuItem ID if available, fallback to name
 
     // Submit feedback or update existing feedback
     await feedbackApi.submitFeedback({
       author: userId,
-      item: dishName,
+      item: itemId,
       rating: rating,
     })
 
@@ -105,7 +106,7 @@ const submitStarRating = async (dishName: string, rating: number) => {
   }
 }
 
-const addToLiked = async (dishName: string) => {
+const addToLiked = async (dishName: string, menuItemId?: string) => {
   if (!user.value?.id) {
     router.push('/login')
     return
@@ -115,7 +116,8 @@ const addToLiked = async (dishName: string) => {
     feedbackMessage.value = ''
 
     const userId = user.value.id.toString()
-    await userTastePreferencesApi.addLikedDish(userId, dishName)
+    const dishId = menuItemId || dishName // Use menuItem ID if available, fallback to name
+    await userTastePreferencesApi.addLikedDish(userId, dishId)
 
     feedbackMessage.value = `✓ Added "${dishName}" to your liked dishes!`
 
@@ -130,7 +132,7 @@ const addToLiked = async (dishName: string) => {
   }
 }
 
-const addToDisliked = async (dishName: string) => {
+const addToDisliked = async (dishName: string, menuItemId?: string) => {
   if (!user.value?.id) {
     router.push('/login')
     return
@@ -140,7 +142,8 @@ const addToDisliked = async (dishName: string) => {
     feedbackMessage.value = ''
 
     const userId = user.value.id.toString()
-    await userTastePreferencesApi.addDislikedDish(userId, dishName)
+    const dishId = menuItemId || dishName // Use menuItem ID if available, fallback to name
+    await userTastePreferencesApi.addDislikedDish(userId, dishId)
 
     feedbackMessage.value = `✓ Added "${dishName}" to your disliked dishes!`
 
@@ -264,7 +267,7 @@ const addToDisliked = async (dishName: string) => {
           <h3 class="menu-title">Full Menu</h3>
           <p class="menu-subtitle">Rate any dish to improve your future recommendations!</p>
           <div class="menu-grid">
-            <div v-for="item in menuItems" :key="item.name" class="menu-item-card">
+            <div v-for="item in menuItems" :key="item.menuItem" class="menu-item-card">
               <h4 class="menu-item-name">{{ item.name }}</h4>
               <p class="menu-item-description">{{ item.description }}</p>
               <p class="menu-item-price">${{ item.price.toFixed(2) }}</p>
@@ -275,7 +278,7 @@ const addToDisliked = async (dishName: string) => {
                   <button
                     v-for="star in 6"
                     :key="star - 1"
-                    @click="submitStarRating(item.name, star - 1)"
+                    @click="submitStarRating(item.name, star - 1, item.menuItem)"
                     :disabled="submittingFeedback"
                     class="menu-star-btn"
                     :title="`${star - 1} star${star - 1 !== 1 ? 's' : ''}`"
@@ -287,7 +290,7 @@ const addToDisliked = async (dishName: string) => {
                 <!-- Like/Dislike buttons -->
                 <div class="menu-preference-buttons">
                   <button
-                    @click="addToLiked(item.name)"
+                    @click="addToLiked(item.name, item.menuItem)"
                     :disabled="submittingFeedback"
                     class="menu-pref-btn like"
                     title="Add to liked"
@@ -295,7 +298,7 @@ const addToDisliked = async (dishName: string) => {
                     👍
                   </button>
                   <button
-                    @click="addToDisliked(item.name)"
+                    @click="addToDisliked(item.name, item.menuItem)"
                     :disabled="submittingFeedback"
                     class="menu-pref-btn dislike"
                     title="Add to disliked"
