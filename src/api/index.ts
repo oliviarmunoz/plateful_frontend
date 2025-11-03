@@ -1,5 +1,5 @@
 // Main API module - exports all API functions
-export { apiClient, API_BASE_URL } from './config'
+export { apiClient, API_BASE } from './config'
 export type { ApiResponse, ApiError } from './config'
 
 // Export all API functions

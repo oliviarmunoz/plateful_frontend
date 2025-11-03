@@ -3,11 +3,11 @@ import axios, { type AxiosInstance } from 'axios'
 // API Configuration
 // In development, use relative URL to leverage Vite proxy
 // In production, this should be set via environment variable
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 // Create axios instance with default configuration
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -22,14 +22,6 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
-    // Debug logging for feedback and user taste preferences endpoints
-    if (config.url?.includes('/Feedback/') || config.url?.includes('/UserTastePreferences/')) {
-      console.log('API Request:', {
-        url: config.url,
-        method: config.method,
-        data: config.data,
-      })
-    }
     return config
   },
   (error) => {
@@ -40,14 +32,6 @@ apiClient.interceptors.request.use(
 // Response interceptor for handling common errors
 apiClient.interceptors.response.use(
   (response) => {
-    // Debug logging for feedback and user taste preferences endpoints
-    if (response.config.url?.includes('/Feedback/') || response.config.url?.includes('/UserTastePreferences/')) {
-      console.log('API Response:', {
-        url: response.config.url,
-        status: response.status,
-        data: response.data,
-      })
-    }
     // Check if response contains an error property (even with 200 status)
     if (response.data && typeof response.data === 'object' && 'error' in response.data) {
       const errorMessage = response.data.error || 'An error occurred'
