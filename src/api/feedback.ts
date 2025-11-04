@@ -12,8 +12,10 @@ export const feedbackApi = {
     item: string
     rating: number
   }): Promise<ApiResponse<{ feedback: string }>> {
+    const request = crypto.randomUUID()
     const response = await apiClient.post('/Feedback/submitFeedback', {
       path: '/Feedback/submitFeedback',
+      request,
       author,
       item,
       rating,
@@ -30,10 +32,11 @@ export const feedbackApi = {
     author: string
     item: string
     newRating: number
-  }): Promise<ApiResponse<{ feedback: string }>> {
+  }): Promise<ApiResponse<{ updatedFeedback: string }>> {
+    const request = crypto.randomUUID()
     const response = await apiClient.post('/Feedback/updateFeedback', {
       path: '/Feedback/updateFeedback',
-      request: {},
+      request,
       author,
       item,
       newRating,
@@ -48,10 +51,11 @@ export const feedbackApi = {
   }: {
     author: string
     item: string
-  }): Promise<ApiResponse<{ successful: boolean }>> {
+  }): Promise<ApiResponse<{ success: boolean }>> {
+    const request = crypto.randomUUID()
     const response = await apiClient.post('/Feedback/deleteFeedback', {
       path: '/Feedback/deleteFeedback',
-      request: {},
+      request,
       author,
       item,
     })
@@ -66,9 +70,10 @@ export const feedbackApi = {
     author: string
     item: string
   }): Promise<ApiResponse<{ feedback: string }[]>> {
+    const request = crypto.randomUUID()
     const response = await apiClient.post('/Feedback/_getFeedback', {
       path: '/Feedback/_getFeedback',
-      request: {},
+      request,
       author,
       item,
     })

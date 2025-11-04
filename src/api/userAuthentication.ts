@@ -25,15 +25,27 @@ export interface GetUsernameResponse {
 export const userAuthenticationApi = {
   // Register a new user
   async register(payload: RegisterPayload) {
-    const res = await apiClient.post<RegisterResponse>('/UserAuthentication/register', payload)
+    const request = crypto.randomUUID()
+    const res = await apiClient.post<RegisterResponse>('/UserAuthentication/register', {
+      path: '/UserAuthentication/register',
+      request,
+      username: payload.username,
+      password: payload.password,
+    })
     return res.data
   },
 
   // Authenticate a user
   async authenticate(payload: AuthenticatePayload) {
+    const request = crypto.randomUUID()
     const res = await apiClient.post<AuthenticateResponse>(
       '/UserAuthentication/authenticate',
-      payload,
+      {
+        path: '/UserAuthentication/authenticate',
+        request,
+        username: payload.username,
+        password: payload.password,
+      },
     )
     return res.data
   },
