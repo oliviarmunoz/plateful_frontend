@@ -3,7 +3,7 @@ import { apiClient, type ApiResponse } from './config'
 // User Taste Preferences API endpoints
 export const userTastePreferencesApi = {
   // Add a dish to user's liked list
-  async addLikedDish(user: string, dish: string): Promise<ApiResponse<{}>> {
+  async addLikedDish(user: string, dish: string): Promise<ApiResponse<Record<string, never>>> {
     const request = crypto.randomUUID()
     const response = await apiClient.post('/UserTastePreferences/addLikedDish', {
       path: '/UserTastePreferences/addLikedDish',
@@ -15,7 +15,7 @@ export const userTastePreferencesApi = {
   },
 
   // Remove a dish from user's liked list
-  async removeLikedDish(user: string, dish: string): Promise<ApiResponse<{}>> {
+  async removeLikedDish(user: string, dish: string): Promise<ApiResponse<Record<string, never>>> {
     const request = crypto.randomUUID()
     const response = await apiClient.post('/UserTastePreferences/removeLikedDish', {
       path: '/UserTastePreferences/removeLikedDish',
@@ -27,7 +27,7 @@ export const userTastePreferencesApi = {
   },
 
   // Add a dish to user's disliked list
-  async addDislikedDish(user: string, dish: string): Promise<ApiResponse<{}>> {
+  async addDislikedDish(user: string, dish: string): Promise<ApiResponse<Record<string, never>>> {
     const request = crypto.randomUUID()
     const response = await apiClient.post('/UserTastePreferences/addDislikedDish', {
       path: '/UserTastePreferences/addDislikedDish',
@@ -39,7 +39,10 @@ export const userTastePreferencesApi = {
   },
 
   // Remove a dish from user's disliked list
-  async removeDislikedDish(user: string, dish: string): Promise<ApiResponse<{}>> {
+  async removeDislikedDish(
+    user: string,
+    dish: string,
+  ): Promise<ApiResponse<Record<string, never>>> {
     const request = crypto.randomUUID()
     const response = await apiClient.post('/UserTastePreferences/removeDislikedDish', {
       path: '/UserTastePreferences/removeDislikedDish',
@@ -61,7 +64,6 @@ export const userTastePreferencesApi = {
     return response.data
   },
 
-  
   // Get all dishes disliked by user
   async getDislikedDishes(user: string): Promise<ApiResponse<{ dishes: string[] }[]>> {
     const request = crypto.randomUUID()

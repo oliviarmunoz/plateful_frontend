@@ -11,11 +11,15 @@ export interface AuthenticatePayload {
 }
 
 export interface RegisterResponse {
-  user: string | number
+  request?: string
+  user?: string | number
+  error?: string
 }
 
 export interface AuthenticateResponse {
-  user: string | number
+  request?: string
+  user?: string | number
+  error?: string
 }
 
 export interface GetUsernameResponse {
@@ -32,7 +36,15 @@ export const userAuthenticationApi = {
       username: payload.username,
       password: payload.password,
     })
-    return res.data
+    const data = res.data
+    // Extract user from response, handling both { user } and { request, user } formats
+    if (data.error) {
+      throw new Error(data.error)
+    }
+    if (!data.user) {
+      throw new Error('Registration failed: no user returned')
+    }
+    return { user: data.user }
   },
 
   // Authenticate a user
@@ -47,7 +59,15 @@ export const userAuthenticationApi = {
         password: payload.password,
       },
     )
-    return res.data
+    const data = res.data
+    // Extract user from response, handling both { user } and { request, user } formats
+    if (data.error) {
+      throw new Error(data.error)
+    }
+    if (!data.user) {
+      throw new Error('Authentication failed: no user returned')
+    }
+    return { user: data.user }
   },
 
   // Get the username of a user

@@ -8,7 +8,7 @@ export const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 // Create axios instance with default configuration
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE,
-  timeout: 10000,
+  timeout: 30000, // Increased timeout to 30s to handle backend processing delays
   headers: {
     'Content-Type': 'application/json',
   },
@@ -51,6 +51,19 @@ apiClient.interceptors.response.use(
       localStorage.removeItem('auth_token')
       // Redirect to login page if needed
       window.location.href = '/login'
+    }
+    // Handle timeout errors specifically
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      return Promise.reject({
+        response: {
+          data: {
+            error: 'Request timed out. The server may be processing your request. Please try again.',
+            message: 'Request timed out. The server may be processing your request. Please try again.',
+          },
+          status: 408,
+        },
+        message: 'Request timed out. The server may be processing your request. Please try again.',
+      })
     }
     return Promise.reject(error)
   },
