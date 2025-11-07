@@ -29,10 +29,7 @@ export interface GetUsernameResponse {
 export const userAuthenticationApi = {
   // Register a new user
   async register(payload: RegisterPayload) {
-    const request = crypto.randomUUID()
     const res = await apiClient.post<RegisterResponse>('/UserAuthentication/register', {
-      path: '/UserAuthentication/register',
-      request,
       username: payload.username,
       password: payload.password,
     })
@@ -49,12 +46,9 @@ export const userAuthenticationApi = {
 
   // Authenticate a user
   async authenticate(payload: AuthenticatePayload) {
-    const request = crypto.randomUUID()
     const res = await apiClient.post<AuthenticateResponse>(
       '/UserAuthentication/authenticate',
       {
-        path: '/UserAuthentication/authenticate',
-        request,
         username: payload.username,
         password: payload.password,
       },
