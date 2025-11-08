@@ -69,24 +69,27 @@ export const userAuthenticationApi = {
 
   // Get the username of a user
   async getUsername(userId: string | number): Promise<GetUsernameResponse> {
-    const res = await apiClient.post<GetUsernameResponse[]>('/UserAuthentication/_getUsername', {
+    const res = await apiClient.post('/UserAuthentication/_getUsername', {
       user: userId,
     })
     const data = res.data
-    if (!Array.isArray(data) || data.length === 0) {
+
+    const username = Array.isArray(data)
+      ? data.find(
+          (candidate): candidate is GetUsernameResponse =>
+            !!candidate && typeof candidate === 'object' && typeof candidate.username === 'string',
+        )?.username
+      : typeof data === 'object' && data !== null && 'username' in data
+        ? (data as { username?: unknown }).username
+        : typeof data === 'string'
+          ? data
+          : undefined
+
+    if (typeof username !== 'string' || username.trim() === '') {
       throw new Error('No username returned')
     }
 
-    const entry = data.find(
-      (candidate): candidate is GetUsernameResponse =>
-        !!candidate && typeof candidate === 'object' && typeof candidate.username === 'string',
-    )
-
-    if (!entry) {
-      throw new Error('Username response malformed')
-    }
-
-    return { username: entry.username }
+    return { username }
   },
 
   // logout
