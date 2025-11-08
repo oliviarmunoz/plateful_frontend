@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#606c38"/>
+  <circle cx="32" cy="26" r="14" fill="#fefae0"/>
+  <path
+    d="M32 12a2 2 0 0 1 2 2v8h8a2 2 0 0 1 0 4h-8v14a2 2 0 0 1-4 0V26h-8a2 2 0 0 1 0-4h8v-8a2 2 0 0 1 2-2Z"
+    fill="#bc6c25"
+  />
+  <text
+    x="32"
+    y="54"
+    text-anchor="middle"
+    font-family="Sans-serif"
+    font-size="12"
+    fill="#fefae0"
+    font-weight="700"
+  >
+    Plateful
+  </text>
+</svg>
+

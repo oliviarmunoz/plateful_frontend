@@ -35,6 +35,19 @@ const normalizeApiEntries = (raw: unknown): unknown[] => {
 const findRecommendationEntry = (
   raw: unknown,
 ): { recommendation?: string; error?: string } | null => {
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    (typeof (raw as { recommendation?: unknown }).recommendation === 'string' ||
+      typeof (raw as { error?: unknown }).error === 'string')
+  ) {
+    return raw as { recommendation?: string; error?: string }
+  }
+
+  if (typeof raw === 'string') {
+    return { recommendation: raw }
+  }
+
   const entries = normalizeApiEntries(raw)
   const match = entries.find(
     (entry): entry is { recommendation?: string; error?: string } =>
@@ -43,6 +56,7 @@ const findRecommendationEntry = (
       (typeof (entry as { recommendation?: unknown }).recommendation === 'string' ||
         typeof (entry as { error?: unknown }).error === 'string'),
   )
+
   return match ?? null
 }
 
