@@ -4,16 +4,16 @@ import { apiClient, type ApiResponse } from './config'
 export const feedbackApi = {
   // Submit new feedback
   async submitFeedback({
-    author,
+    session,
     item,
     rating,
   }: {
-    author: string
+    session: string
     item: string
     rating: number
   }): Promise<ApiResponse<{ feedback: string }>> {
     const response = await apiClient.post('/Feedback/submitFeedback', {
-      author,
+      session,
       item,
       rating,
     })
@@ -22,16 +22,16 @@ export const feedbackApi = {
 
   // Update existing feedback
   async updateFeedback({
-    author,
+    session,
     item,
     newRating,
   }: {
-    author: string
+    session: string
     item: string
     newRating: number
   }): Promise<ApiResponse<{ updatedFeedback: string }>> {
     const response = await apiClient.post('/Feedback/updateFeedback', {
-      author,
+      session,
       item,
       newRating,
     })
@@ -40,14 +40,14 @@ export const feedbackApi = {
 
   // Delete feedback
   async deleteFeedback({
-    author,
+    session,
     item,
   }: {
-    author: string
+    session: string
     item: string
   }): Promise<ApiResponse<{ success: boolean }>> {
     const response = await apiClient.post('/Feedback/deleteFeedback', {
-      author,
+      session,
       item,
     })
     return response.data
@@ -65,6 +65,16 @@ export const feedbackApi = {
       author,
       item,
     })
+    return response.data
+  },
+
+  // Get all feedback for a given user
+  async getAllUserRatings({
+    author,
+  }: {
+    author: string
+  }): Promise<ApiResponse<{ feedback: string }[]>> {
+    const response = await apiClient.post('/Feedback/_getAllUserRatings', { author })
     return response.data
   },
 }

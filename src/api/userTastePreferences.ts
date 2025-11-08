@@ -3,57 +3,75 @@ import { apiClient, type ApiResponse } from './config'
 // User Taste Preferences API endpoints
 export const userTastePreferencesApi = {
   // Add a dish to user's liked list
-  async addLikedDish(user: string, dish: string): Promise<ApiResponse<Record<string, never>>> {
-    const response = await apiClient.post('/UserTastePreferences/addLikedDish', {
-      user,
-      dish,
-    })
+  async addLikedDish({
+    session,
+    dish,
+  }: {
+    session: string
+    dish: string
+  }): Promise<ApiResponse<Record<string, never>>> {
+    const response = await apiClient.post('/UserTastePreferences/addLikedDish', { session, dish })
     return response.data
   },
 
   // Remove a dish from user's liked list
-  async removeLikedDish(user: string, dish: string): Promise<ApiResponse<Record<string, never>>> {
+  async removeLikedDish({
+    session,
+    dish,
+  }: {
+    session: string
+    dish: string
+  }): Promise<ApiResponse<Record<string, never>>> {
     const response = await apiClient.post('/UserTastePreferences/removeLikedDish', {
-      user,
+      session,
       dish,
     })
     return response.data
   },
 
   // Add a dish to user's disliked list
-  async addDislikedDish(user: string, dish: string): Promise<ApiResponse<Record<string, never>>> {
+  async addDislikedDish({
+    session,
+    dish,
+  }: {
+    session: string
+    dish: string
+  }): Promise<ApiResponse<Record<string, never>>> {
     const response = await apiClient.post('/UserTastePreferences/addDislikedDish', {
-      user,
+      session,
       dish,
     })
     return response.data
   },
 
   // Remove a dish from user's disliked list
-  async removeDislikedDish(
-    user: string,
-    dish: string,
-  ): Promise<ApiResponse<Record<string, never>>> {
+  async removeDislikedDish({
+    session,
+    dish,
+  }: {
+    session: string
+    dish: string
+  }): Promise<ApiResponse<Record<string, never>>> {
     const response = await apiClient.post('/UserTastePreferences/removeDislikedDish', {
-      user,
+      session,
       dish,
     })
     return response.data
   },
 
   // Get all dishes liked by user
-  async getLikedDishes(user: string): Promise<ApiResponse<{ dishes: string[] }[]>> {
-    const response = await apiClient.post('/UserTastePreferences/_getLikedDishes', {
-      user,
-    })
+  async getLikedDishes({ user }: { user: string }): Promise<ApiResponse<{ dishes: string[] }[]>> {
+    const response = await apiClient.post('/UserTastePreferences/_getLikedDishes', { user })
     return response.data
   },
 
   // Get all dishes disliked by user
-  async getDislikedDishes(user: string): Promise<ApiResponse<{ dishes: string[] }[]>> {
-    const response = await apiClient.post('/UserTastePreferences/_getDislikedDishes', {
-      user,
-    })
+  async getDislikedDishes({
+    user,
+  }: {
+    user: string
+  }): Promise<ApiResponse<{ dishes: string[] }[]>> {
+    const response = await apiClient.post('/UserTastePreferences/_getDislikedDishes', { user })
     return response.data
   },
 }

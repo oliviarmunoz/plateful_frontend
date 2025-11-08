@@ -148,16 +148,7 @@ const handleSignup = async () => {
       password: form.password,
     })
 
-    const authRes = await userAuthenticationApi.authenticate({
-      username: form.username,
-      password: form.password,
-    })
-
-    const userId = authRes.user
-    const userSession = { id: userId, username: form.username, email: form.email }
-    localStorage.setItem('user', JSON.stringify(userSession))
-
-    router.push('/')
+    router.push('/login')
   } catch (err: unknown) {
     const apiErr = err as { response?: { data?: { message?: string } }; message?: string }
     const message =

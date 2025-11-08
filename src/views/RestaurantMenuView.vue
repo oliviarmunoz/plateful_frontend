@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { restaurantMenuApi, feedbackApi, userTastePreferencesApi, type User } from '@/api'
+import {
+  restaurantMenuApi,
+  feedbackApi,
+  userTastePreferencesApi,
+  sessioningApi,
+  userAuthenticationApi,
+  type User,
+} from '@/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,25 +18,44 @@ const menuItems = ref<{ menuItem: string; name: string; description: string; pri
 const recommendation = ref('')
 const loading = ref(true)
 const error = ref('')
-const user = ref<User | null>(null)
 const feedbackMessage = ref('')
 const submittingFeedback = ref(false)
-const getCurrentUser = () => {
-  const userData = localStorage.getItem('user')
-  if (userData) {
-    return JSON.parse(userData)
+const getCurrentUser = async (): Promise<User | null> => {
+  const authToken = localStorage.getItem('auth_token')
+  if (!authToken) {
+    return null
   }
-  return null
+
+  try {
+    const sessionResponse = await sessioningApi.getUser(authToken)
+    if (sessionResponse?.error) {
+      throw new Error(sessionResponse.error)
+    }
+
+    const sessionUser = sessionResponse?.user
+    if (!sessionUser) {
+      throw new Error('No user returned for this session')
+    }
+
+    const { username } = await userAuthenticationApi.getUsername(sessionUser)
+
+    return {
+      id: sessionUser,
+      username,
+    }
+  } catch (err) {
+    console.error('Failed to resolve current user:', err)
+    return null
+  }
 }
-user.value = getCurrentUser()
 
 onMounted(async () => {
   try {
     loading.value = true
     error.value = ''
 
-    const userId = user.value?.id?.toString()
-    if (!userId) {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
       router.push('/login')
       return
     }
@@ -42,17 +68,31 @@ onMounted(async () => {
       // restaurant not found
       error.value = 'RESTAURANT_NOT_FOUND'
     } else if (Array.isArray(menuResponse)) {
-      menuItems.value = menuResponse as { menuItem: string; name: string; description: string; price: number }[]
+      menuItems.value = menuResponse as {
+        menuItem: string
+        name: string
+        description: string
+        price: number
+      }[]
     }
 
     // Fetch recommendation
     try {
-      const recResponse = await restaurantMenuApi._getRecommendation(restaurantName, userId)
-      if (Array.isArray(recResponse) && recResponse.length > 0 && !('error' in recResponse[0])) {
-        recommendation.value = recResponse[0].recommendation
+      const recommendationResponse = await restaurantMenuApi._getRecommendation(
+        restaurantName,
+        currentUser.id,
+      )
+      if (recommendationResponse?.error) {
+        error.value = recommendationResponse.error
+      } else if (recommendationResponse?.recommendation) {
+        recommendation.value = recommendationResponse.recommendation
       }
-    } catch {
-      // If recommendation fails, still show the menu
+    } catch (err: unknown) {
+      const apiErr = err as { response?: { data?: { error?: string; message?: string } } }
+      error.value =
+        apiErr?.response?.data?.error ||
+        apiErr?.response?.data?.message ||
+        'Failed to load recommendation.'
     }
   } catch (err: unknown) {
     const apiErr = err as { response?: { data?: { error?: string; message?: string } } }
@@ -74,21 +114,20 @@ const goHome = () => {
 }
 
 const submitStarRating = async (dishName: string, rating: number, menuItemId?: string) => {
-  if (!user.value?.id) {
-    router.push('/login')
-    return
-  }
-
   try {
     submittingFeedback.value = true
     feedbackMessage.value = ''
 
-    const userId = user.value.id.toString()
+    const authToken = localStorage.getItem('auth_token')
+    if (!authToken) {
+      router.push('/login')
+      return
+    }
     const itemId = menuItemId || dishName // Use menuItem ID if available, fallback to name
 
     // Submit feedback or update existing feedback
     await feedbackApi.submitFeedback({
-      author: userId,
+      session: authToken,
       item: itemId,
       rating: rating,
     })
@@ -106,8 +145,9 @@ const submitStarRating = async (dishName: string, rating: number, menuItemId?: s
   }
 }
 
-const addToLiked = async (dishName: string, menuItemId?: string) => {
-  if (!user.value?.id) {
+const addToLiked = async (dishName: string) => {
+  const authToken = localStorage.getItem('auth_token')
+  if (!authToken) {
     router.push('/login')
     return
   }
@@ -115,9 +155,8 @@ const addToLiked = async (dishName: string, menuItemId?: string) => {
     submittingFeedback.value = true
     feedbackMessage.value = ''
 
-    const userId = user.value.id.toString()
-    const dishId = menuItemId || dishName // Use menuItem ID if available, fallback to name
-    await userTastePreferencesApi.addLikedDish(userId, dishId)
+    const dishId = await restaurantMenuApi._getMenuItemByName(dishName)
+    await userTastePreferencesApi.addLikedDish({session: authToken, dish: dishId.menuItem})
 
     feedbackMessage.value = `✓ Added "${dishName}" to your liked dishes!`
 
@@ -133,7 +172,8 @@ const addToLiked = async (dishName: string, menuItemId?: string) => {
 }
 
 const addToDisliked = async (dishName: string, menuItemId?: string) => {
-  if (!user.value?.id) {
+  const authToken = localStorage.getItem('auth_token')
+  if (!authToken) {
     router.push('/login')
     return
   }
@@ -141,9 +181,8 @@ const addToDisliked = async (dishName: string, menuItemId?: string) => {
     submittingFeedback.value = true
     feedbackMessage.value = ''
 
-    const userId = user.value.id.toString()
     const dishId = menuItemId || dishName // Use menuItem ID if available, fallback to name
-    await userTastePreferencesApi.addDislikedDish(userId, dishId)
+    await userTastePreferencesApi.addDislikedDish({session: authToken, dish: dishId})
 
     feedbackMessage.value = `✓ Added "${dishName}" to your disliked dishes!`
 

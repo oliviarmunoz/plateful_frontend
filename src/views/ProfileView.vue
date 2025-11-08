@@ -1,66 +1,265 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, toRaw } from 'vue'
 import { useRouter } from 'vue-router'
-import { userTastePreferencesApi, feedbackApi, type User } from '@/api'
+import {
+  userTastePreferencesApi,
+  feedbackApi,
+  userAuthenticationApi,
+  restaurantMenuApi,
+  type User,
+  sessioningApi,
+} from '@/api'
 
 const router = useRouter()
+
+interface MenuPreference {
+  id: string
+  name: string
+  description: string
+  price: number
+}
 const loading = ref(false)
 const error = ref('')
 const user = ref<User | null>(null)
-const likedDishes = ref<string[]>([])
-const dislikedDishes = ref<string[]>([])
+const likedDishes = ref<MenuPreference[]>([])
+const dislikedDishes = ref<MenuPreference[]>([])
+const feedback = ref<{ id: string; dish: string; rating: number }[]>([])
 const dishFeedback = ref<Record<string, number>>({})
 const submittingFeedback = ref(false)
 const feedbackMessage = ref('')
 const showingRatingControls = ref<Record<string, boolean>>({})
 
-// Get current user from localStorage
-const getCurrentUser = () => {
-  const userData = localStorage.getItem('user')
-  if (userData) {
-    return JSON.parse(userData)
+// get current user
+const getCurrentUser = async (): Promise<User | null> => {
+  const authToken = localStorage.getItem('auth_token')
+  if (!authToken) {
+    router.push('/login')
+    return null
   }
-  return null
+  try {
+    const sessionResponse = await sessioningApi.getUser(authToken)
+    if (sessionResponse?.error) {
+      throw new Error(sessionResponse.error)
+    }
+    const sessionUser = sessionResponse?.user
+    if (!sessionUser) {
+      throw new Error('No user returned for this session')
+    }
+
+    const { username } = await userAuthenticationApi.getUsername(sessionUser)
+
+    return {
+      id: sessionUser,
+      username,
+      sessionId: authToken,
+    }
+  } catch (err) {
+    console.error('Failed to resolve current user:', err)
+    router.push('/login')
+    return null
+  }
 }
+const resolveMenuPreferences = async (dishIds: string[]): Promise<MenuPreference[]> => {
+  const uniqueIds = [
+    ...new Set(dishIds.map((dishId) => dishId?.trim()).filter((id): id is string => !!id)),
+  ]
+  if (uniqueIds.length === 0) {
+    return []
+  }
+
+  const resolved = await Promise.all(
+    uniqueIds.map(async (dishId) => {
+      const resolveFromResponse = (
+        rawResponse: unknown,
+      ): { name: string; description?: string; price?: number | string } | null => {
+        if (!rawResponse) {
+          return null
+        }
+
+        const dataArray = Array.isArray(rawResponse)
+          ? rawResponse
+          : Array.isArray((rawResponse as { data?: unknown })?.data)
+            ? ((rawResponse as { data?: unknown }).data as unknown[])
+            : []
+
+        if (!Array.isArray(dataArray) || dataArray.length === 0) {
+          return null
+        }
+
+        return (
+          dataArray.find(
+            (
+              entry: unknown,
+            ): entry is {
+              name: string
+              description?: string
+              price?: number | string
+            } => {
+              if (!entry || (typeof entry !== 'object' && typeof entry !== 'function')) {
+                return false
+              }
+              if ('error' in entry) {
+                return false
+              }
+              return typeof (entry as { name?: unknown }).name === 'string'
+            },
+          ) || null
+        )
+      }
+
+      try {
+        let firstEntry = resolveFromResponse(await restaurantMenuApi._getMenuItemDetails(dishId))
+
+        if (!firstEntry) {
+          firstEntry = resolveFromResponse(await restaurantMenuApi._getMenuItemByName(dishId))
+        }
+
+        if (!firstEntry) {
+          return {
+            id: dishId,
+            name: dishId,
+            description: '',
+            price: 0,
+          }
+        }
+
+        const numericPrice = Number(firstEntry.price)
+
+        return {
+          id: dishId,
+          name: firstEntry.name,
+          description: typeof firstEntry.description === 'string' ? firstEntry.description : '',
+          price: Number.isFinite(numericPrice) ? numericPrice : 0,
+        }
+      } catch (err) {
+        console.error('Failed to resolve menu item details', { dishId, err })
+        return {
+          id: dishId,
+          name: dishId,
+          description: '',
+          price: 0,
+        }
+      }
+    }),
+  )
+
+  return resolved
+}
+
+const setDishRating = (dish: MenuPreference, rating: number) => {
+  dishFeedback.value[dish.id] = rating
+  if (dish.name) {
+    dishFeedback.value[dish.name] = rating
+  }
+}
+
+const clearDishRating = (dish: MenuPreference) => {
+  delete dishFeedback.value[dish.id]
+  if (dish.name) {
+    delete dishFeedback.value[dish.name]
+  }
+}
+
+const getDishRating = (dish: MenuPreference): number | undefined => {
+  const byId = dishFeedback.value[dish.id]
+  if (byId !== undefined && byId !== null) {
+    return byId
+  }
+  const byName = dishFeedback.value[dish.name]
+  if (byName !== undefined && byName !== null) {
+    setDishRating(dish, byName)
+    return byName
+  }
+  return undefined
+}
+
+const normalizeDishRatings = (dishes: MenuPreference[]) => {
+  dishes.forEach((dish) => {
+    const rating = getDishRating(dish)
+    if (rating !== undefined) {
+      setDishRating(dish, rating)
+    }
+  })
+}
+
 const loadUserData = async () => {
   try {
     loading.value = true
     error.value = ''
 
-    const currentUser = getCurrentUser()
+    const currentUser = await getCurrentUser()
     if (!currentUser) {
-      router.push('/login')
       return
     }
     user.value = currentUser
 
     // Load user's taste preferences
-    const userId = currentUser.id.toString()
     const [likedResponse, dislikedResponse] = await Promise.all([
-      userTastePreferencesApi.getLikedDishes(userId),
-      userTastePreferencesApi.getDislikedDishes(userId),
+      userTastePreferencesApi.getLikedDishes({ user: user.value.id }),
+      userTastePreferencesApi.getDislikedDishes({ user: user.value.id }),
     ])
 
-    if (Array.isArray(likedResponse) && likedResponse.length > 0) {
-      likedDishes.value = likedResponse
-        .flatMap((item) => item.dishes)
-        .filter((dish) => dish && dish.trim() !== '')
-    } else {
-      likedDishes.value = []
+    const extractDishIdentifiers = (response: unknown): string[] => {
+      if (!response) {
+        return []
+      }
+
+      const entries = Array.isArray(response) ? response : [response]
+
+      return entries
+        .flatMap((entry) => {
+          if (!entry || typeof entry !== 'object') {
+            return []
+          }
+
+          const dishesField = (entry as { dishes?: unknown }).dishes
+
+          if (Array.isArray(dishesField)) {
+            return dishesField
+          }
+
+          if (typeof dishesField === 'string') {
+            return [dishesField]
+          }
+
+          return []
+        })
+        .concat(entries.filter((entry) => typeof entry === 'string').map((dish) => dish as string))
+        .map((dish) => dish?.trim())
+        .filter((dish): dish is string => !!dish)
     }
 
-    if (Array.isArray(dislikedResponse) && dislikedResponse.length > 0) {
-      dislikedDishes.value = dislikedResponse
-        .flatMap((item) => item.dishes)
-        .filter((dish) => dish && dish.trim() !== '')
-    } else {
-      dislikedDishes.value = []
-    }
+    const likedDishIds = extractDishIdentifiers(likedResponse)
+    const dislikedDishIds = extractDishIdentifiers(dislikedResponse)
+
+    likedDishes.value = await resolveMenuPreferences(likedDishIds)
+    dislikedDishes.value = await resolveMenuPreferences(dislikedDishIds)
+
+    normalizeDishRatings([...likedDishes.value, ...dislikedDishes.value])
 
     // Fetch feedback for all dishes
-    const allDishes = [...likedDishes.value, ...dislikedDishes.value]
-    if (allDishes.length > 0) {
-      await fetchFeedbackForDishes(allDishes, userId)
+
+    const feedbackResponse = await feedbackApi.getAllUserRatings({
+      author: user.value.id,
+    })
+
+    if (Array.isArray(feedbackResponse) && feedbackResponse.length > 0) {
+      const plainFeedback = feedbackResponse.map((item) => ({
+        id: item._id,
+        dish: item.target,
+        rating: item.rating,
+      }))
+
+      feedback.value = toRaw(plainFeedback)
+      dishFeedback.value = plainFeedback.reduce<Record<string, number>>((acc, item) => {
+        if (item.dish) {
+          acc[item.dish] = item.rating
+        }
+        return acc
+      }, {})
+    } else {
+      feedback.value = []
+      dishFeedback.value = {}
     }
   } catch (err: unknown) {
     const apiError = err as {
@@ -77,27 +276,17 @@ const loadUserData = async () => {
   }
 }
 
-const removeLikedDish = async (dishId: string) => {
-  if (!user.value?.id) {
-    error.value = 'User not logged in'
-    return
-  }
-  const trimmedDishId = dishId?.trim() || ''
-  if (!trimmedDishId) {
-    error.value = 'Invalid dish ID'
-    return
-  }
-
-  const userId = user.value.id.toString().trim()
-  if (!userId) {
-    error.value = 'User ID is required'
+const removeLikedDish = async (dish: MenuPreference) => {
+  console.log('removing liked dish', dish.name)
+  const authToken = localStorage.getItem('auth_token')
+  if (!authToken) {
+    router.push('/login')
     return
   }
 
   try {
-    console.log('Removing liked dish:', { userId, dishId: trimmedDishId })
-    await userTastePreferencesApi.removeLikedDish(userId, trimmedDishId)
-    likedDishes.value = likedDishes.value.filter((d) => d !== dishId)
+    await userTastePreferencesApi.removeLikedDish({ session: authToken, dish: dish.id })
+    likedDishes.value = likedDishes.value.filter((d) => d.id !== dish.id)
     error.value = '' // Clear any previous errors on success
   } catch (err: unknown) {
     const apiError = err as {
@@ -110,31 +299,20 @@ const removeLikedDish = async (dishId: string) => {
       apiError?.message ||
       'Failed to remove liked dish'
     console.error('Error removing liked dish:', err)
-    console.error('Error details:', { userId, dishId: trimmedDishId, error: apiError })
   }
 }
 
-const removeDislikedDish = async (dishId: string) => {
-  if (!user.value?.id) {
-    error.value = 'User not logged in'
-    return
-  }
-  const trimmedDishId = dishId?.trim() || ''
-  if (!trimmedDishId) {
-    error.value = 'Invalid dish ID'
-    return
-  }
-
-  const userId = user.value.id.toString().trim()
-  if (!userId) {
-    error.value = 'User ID is required'
+const removeDislikedDish = async (dish: MenuPreference) => {
+  const authToken = localStorage.getItem('auth_token')
+  if (!authToken) {
+    router.push('/login')
     return
   }
 
   try {
-    console.log('Removing disliked dish:', { userId, dishId: trimmedDishId })
-    await userTastePreferencesApi.removeDislikedDish(userId, trimmedDishId)
-    dislikedDishes.value = dislikedDishes.value.filter((d) => d !== dishId)
+    console.log('Removing disliked dish:', { dishId: dish.id })
+    await userTastePreferencesApi.removeDislikedDish({ session: authToken, dish: dish.id })
+    dislikedDishes.value = dislikedDishes.value.filter((d) => d.id !== dish.id)
     error.value = '' // Clear any previous errors on success
   } catch (err: unknown) {
     const apiError = err as {
@@ -147,77 +325,22 @@ const removeDislikedDish = async (dishId: string) => {
       apiError?.message ||
       'Failed to remove disliked dish'
     console.error('Error removing disliked dish:', err)
-    console.error('Error details:', { userId, dishId: trimmedDishId, error: apiError })
   }
 }
 
-const fetchFeedbackForDishes = async (dishes: string[], userId: string) => {
-  const feedbackPromises = dishes.map(async (dish) => {
-    try {
-      const response = await feedbackApi.getFeedback({
-        author: userId,
-        item: dish,
-      })
+const logout = async () => {
+  const authToken = localStorage.getItem('auth_token')
 
-      const feedbackData = response?.data
-
-      if (feedbackData && Array.isArray(feedbackData) && feedbackData.length > 0) {
-        const firstFeedback = feedbackData[0] as { feedback?: unknown }
-        if (!firstFeedback || !firstFeedback.feedback) {
-          return { dish, rating: null }
-        }
-        // Parse the feedback object to extract the rating
-        const feedbackObj = firstFeedback.feedback
-
-        // Try different parsing approaches
-        let rating = null
-
-        // Method 1: Check if feedback is an object with a rating property
-        if (typeof feedbackObj === 'object' && feedbackObj !== null) {
-          const anyObj = feedbackObj as Record<string, unknown>
-          if ('rating' in anyObj) {
-            rating = Number(anyObj.rating)
-          } else if ('value' in anyObj) {
-            rating = Number(anyObj.value)
-          } else if ('score' in anyObj) {
-            rating = Number(anyObj.score)
-          }
-        }
-
-        // Method 2: If feedback is a string, try to parse it
-        if (rating === null && typeof feedbackObj === 'string') {
-          const ratingMatch = feedbackObj.match(/rating[:\s]*(\d+(?:\.\d+)?)/i)
-          if (ratingMatch) {
-            rating = Number(ratingMatch[1] ?? '')
-          } else {
-            const numberMatch = feedbackObj.match(/(\d+(?:\.\d+)?)/)
-            if (numberMatch) {
-              rating = Number(numberMatch[1] ?? '')
-            }
-          }
-        }
-
-        return { dish, rating }
-      }
-      return { dish, rating: null }
-    } catch {
-      return { dish, rating: null }
+  try {
+    if (authToken) {
+      await userAuthenticationApi.logout(authToken)
     }
-  })
-
-  const results = await Promise.all(feedbackPromises)
-
-  results.forEach(({ dish, rating }) => {
-    if (rating !== null) {
-      dishFeedback.value[dish] = rating
-    }
-  })
-}
-
-const logout = () => {
-  localStorage.removeItem('auth_token')
-  localStorage.removeItem('user')
-  router.push('/')
+  } catch (err) {
+    console.error('Error logging out:', err)
+  } finally {
+    localStorage.removeItem('auth_token')
+    router.push('/login')
+  }
 }
 
 const goHome = () => {
@@ -241,14 +364,19 @@ const getStarRating = (rating: number) => {
 let originalRating: number | undefined
 let originalControlsVisible = false
 
-const submitStarRating = async (dishName: string, rating: number) => {
+const submitStarRating = async (dish: MenuPreference, rating: number) => {
   if (!user.value?.id) {
     router.push('/login')
     return
   }
 
-  // Prevent multiple simultaneous submissions
   if (submittingFeedback.value) {
+    return
+  }
+
+  const authToken = localStorage.getItem('auth_token')
+  if (!authToken) {
+    router.push('/login')
     return
   }
 
@@ -256,57 +384,42 @@ const submitStarRating = async (dishName: string, rating: number) => {
     submittingFeedback.value = true
     feedbackMessage.value = ''
 
-    const userId = user.value.id.toString()
+    originalRating = getDishRating(dish)
+    originalControlsVisible = showingRatingControls.value[dish.id] || false
 
-    // Store the original state for potential rollback
-    originalRating = dishFeedback.value[dishName]
-    originalControlsVisible = showingRatingControls.value[dishName] || false
+    setDishRating(dish, rating)
 
-    // Update UI state optimistically but keep controls visible during submission
-    dishFeedback.value[dishName] = rating
-
-    // Check if feedback already exists for this dish
-    const existingFeedback = originalRating !== undefined
-
-    if (existingFeedback) {
-      // Update existing feedback
+    if (originalRating !== undefined) {
       await feedbackApi.updateFeedback({
-        author: userId,
-        item: dishName,
+        session: authToken,
+        item: dish.id,
         newRating: rating,
       })
-
-      feedbackMessage.value = `✓ Updated "${dishName}" to ${rating} star${rating !== 1 ? 's' : ''}!`
+      feedbackMessage.value = `✓ Updated "${dish.name}" to ${rating} star${rating !== 1 ? 's' : ''}!`
     } else {
-      // Submit new feedback
       await feedbackApi.submitFeedback({
-        author: userId,
-        item: dishName,
+        session: authToken,
+        item: dish.id,
         rating: rating,
       })
-
-      feedbackMessage.value = `✓ Rated "${dishName}" ${rating} star${rating !== 1 ? 's' : ''}!`
+      feedbackMessage.value = `✓ Rated "${dish.name}" ${rating} star${rating !== 1 ? 's' : ''}!`
     }
 
-    // Hide rating controls only after successful API call
-    showingRatingControls.value[dishName] = false
+    showingRatingControls.value[dish.id] = false
 
-    // Clear feedback message after delay
     setTimeout(() => {
       feedbackMessage.value = ''
     }, 3000)
   } catch (err: unknown) {
     console.error('Error in submitStarRating:', err)
 
-    // Revert the optimistic update on error
     if (originalRating !== undefined) {
-      dishFeedback.value[dishName] = originalRating
+      setDishRating(dish, originalRating)
     } else {
-      delete dishFeedback.value[dishName]
+      clearDishRating(dish)
     }
 
-    // Restore original controls visibility
-    showingRatingControls.value[dishName] = originalControlsVisible
+    showingRatingControls.value[dish.id] = originalControlsVisible
 
     const apiErr = err as { response?: { data?: { error?: string } } }
     feedbackMessage.value = `Error: ${apiErr?.response?.data?.error || 'Failed to submit rating'}`
@@ -314,9 +427,8 @@ const submitStarRating = async (dishName: string, rating: number) => {
     submittingFeedback.value = false
   }
 }
-
-const toggleRatingControls = (dishName: string) => {
-  showingRatingControls.value[dishName] = !showingRatingControls.value[dishName]
+const toggleRatingControls = (dishId: string) => {
+  showingRatingControls.value[dishId] = !showingRatingControls.value[dishId]
 }
 
 onMounted(() => {
@@ -467,56 +579,53 @@ onMounted(() => {
                 <p>No liked dishes yet. Start rating dishes to build your taste profile!</p>
               </div>
               <div v-else class="dish-list">
-                <div v-for="dish in likedDishes" :key="dish" class="dish-item">
+                <div v-for="dish in likedDishes" :key="dish.id" class="dish-item">
                   <div class="dish-info">
-                    <span class="dish-name">{{ dish }}</span>
+                    <span class="dish-name">{{ dish.name }}</span>
                     <div class="feedback-section">
                       <!-- Display current rating if exists -->
-                      <div
-                        v-if="dishFeedback[dish] !== undefined && dishFeedback[dish] !== null"
-                        class="current-rating"
-                      >
+                      <div v-if="getDishRating(dish) !== undefined" class="current-rating">
                         <div class="star-rating-display">
                           <span
-                            v-for="i in getStarRating(dishFeedback[dish]).fullStars"
+                            v-for="i in getStarRating(getDishRating(dish) || 0).fullStars"
                             :key="`full-${i}`"
                             class="star full"
                             >★</span
                           >
                           <span
-                            v-if="getStarRating(dishFeedback[dish]).hasHalfStar"
+                            v-if="getStarRating(getDishRating(dish) || 0).hasHalfStar"
                             class="star half"
                             >★</span
                           >
                           <span
-                            v-for="i in getStarRating(dishFeedback[dish]).emptyStars"
+                            v-for="i in getStarRating(getDishRating(dish) || 0).emptyStars"
                             :key="`empty-${i}`"
                             class="star empty"
                             >☆</span
                           >
                         </div>
-                        <span class="rating-text">{{ dishFeedback[dish] }}/5</span>
+                        <span class="rating-text">{{ getDishRating(dish) }}/5</span>
                       </div>
 
                       <!-- Rating toggle button -->
                       <div class="rating-toggle">
                         <button
-                          @click="toggleRatingControls(dish)"
+                          @click="toggleRatingControls(dish.id)"
                           class="toggle-btn"
                           :disabled="submittingFeedback"
                         >
                           <span v-if="submittingFeedback">⏳</span>
                           <span v-else>{{
-                            showingRatingControls[dish] ? 'Hide Rating' : 'Rate/Update'
+                            showingRatingControls[dish.id] ? 'Hide Rating' : 'Rate/Update'
                           }}</span>
                         </button>
                       </div>
 
                       <!-- Interactive star rating buttons (hidden by default) -->
-                      <div v-show="showingRatingControls[dish]" class="rating-controls">
+                      <div v-show="showingRatingControls[dish.id]" class="rating-controls">
                         <p class="rating-label">
                           {{
-                            dishFeedback[dish] !== undefined ? 'Update rating:' : 'Rate this dish:'
+                            getDishRating(dish) !== undefined ? 'Update rating:' : 'Rate this dish:'
                           }}
                         </p>
                         <div class="star-buttons">
@@ -527,7 +636,7 @@ onMounted(() => {
                             :disabled="submittingFeedback"
                             class="star-btn"
                             :class="{
-                              active: dishFeedback[dish] === star - 1,
+                              active: getDishRating(dish) === star - 1,
                               loading: submittingFeedback,
                             }"
                             :title="`${star - 1} star${star - 1 !== 1 ? 's' : ''}`"
@@ -585,56 +694,53 @@ onMounted(() => {
                 <p>No disliked dishes yet. Start rating dishes to build your taste profile!</p>
               </div>
               <div v-else class="dish-list">
-                <div v-for="dish in dislikedDishes" :key="dish" class="dish-item">
+                <div v-for="dish in dislikedDishes" :key="dish.id" class="dish-item">
                   <div class="dish-info">
-                    <span class="dish-name">{{ dish }}</span>
+                    <span class="dish-name">{{ dish.name }}</span>
                     <div class="feedback-section">
                       <!-- Display current rating if exists -->
-                      <div
-                        v-if="dishFeedback[dish] !== undefined && dishFeedback[dish] !== null"
-                        class="current-rating"
-                      >
+                      <div v-if="getDishRating(dish) !== undefined" class="current-rating">
                         <div class="star-rating-display">
                           <span
-                            v-for="i in getStarRating(dishFeedback[dish]).fullStars"
+                            v-for="i in getStarRating(getDishRating(dish) || 0).fullStars"
                             :key="`full-${i}`"
                             class="star full"
                             >★</span
                           >
                           <span
-                            v-if="getStarRating(dishFeedback[dish]).hasHalfStar"
+                            v-if="getStarRating(getDishRating(dish) || 0).hasHalfStar"
                             class="star half"
                             >★</span
                           >
                           <span
-                            v-for="i in getStarRating(dishFeedback[dish]).emptyStars"
+                            v-for="i in getStarRating(getDishRating(dish) || 0).emptyStars"
                             :key="`empty-${i}`"
                             class="star empty"
                             >☆</span
                           >
                         </div>
-                        <span class="rating-text">{{ dishFeedback[dish] }}/5</span>
+                        <span class="rating-text">{{ getDishRating(dish) }}/5</span>
                       </div>
 
                       <!-- Rating toggle button -->
                       <div class="rating-toggle">
                         <button
-                          @click="toggleRatingControls(dish)"
+                          @click="toggleRatingControls(dish.id)"
                           class="toggle-btn"
                           :disabled="submittingFeedback"
                         >
                           <span v-if="submittingFeedback">⏳</span>
                           <span v-else>{{
-                            showingRatingControls[dish] ? 'Hide Rating' : 'Rate/Update'
+                            showingRatingControls[dish.id] ? 'Hide Rating' : 'Rate/Update'
                           }}</span>
                         </button>
                       </div>
 
                       <!-- Interactive star rating buttons (hidden by default) -->
-                      <div v-show="showingRatingControls[dish]" class="rating-controls">
+                      <div v-show="showingRatingControls[dish.id]" class="rating-controls">
                         <p class="rating-label">
                           {{
-                            dishFeedback[dish] !== undefined ? 'Update rating:' : 'Rate this dish:'
+                            getDishRating(dish) !== undefined ? 'Update rating:' : 'Rate this dish:'
                           }}
                         </p>
                         <div class="star-buttons">
@@ -645,7 +751,7 @@ onMounted(() => {
                             :disabled="submittingFeedback"
                             class="star-btn"
                             :class="{
-                              active: dishFeedback[dish] === star - 1,
+                              active: getDishRating(dish) === star - 1,
                               loading: submittingFeedback,
                             }"
                             :title="`${star - 1} star${star - 1 !== 1 ? 's' : ''}`"

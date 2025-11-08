@@ -22,24 +22,15 @@ const handleLogin = async () => {
       username: form.username,
       password: form.password,
     })
-
-    // Persist minimal session
-    const userId = authRes.user
-    const userSession = { id: userId, username: form.username }
-    localStorage.setItem('user', JSON.stringify(userSession))
-    // Redirect to home page
+    localStorage.setItem('auth_token', authRes.session)
     router.push('/')
   } catch (err: unknown) {
-    const apiErr = err as {
-      response?: { data?: { error?: string; message?: string } }
-      message?: string
+    if (err instanceof Error) {
+      error.value = err.message
+    } else {
+      error.value = 'Login failed. Please try again.'
     }
-    const message =
-      apiErr?.response?.data?.error ||
-      apiErr?.response?.data?.message ||
-      apiErr?.message ||
-      'Login failed. Please try again.'
-    error.value = message
+    localStorage.removeItem('auth_token')
   } finally {
     loading.value = false
   }

@@ -69,9 +69,20 @@ export const restaurantMenuApi = {
     restaurant: string,
     user: string,
   ): Promise<ApiResponse<{ recommendation: string }[] | { error: string }[]>> {
-    const response = await apiClient.post('/RestaurantMenu/_getRecommendation', {
+    const response = await apiClient.post('/recommendation', {
       restaurant,
       user,
+    })
+    return response.data
+  },
+
+  async _getMenuItemByName(
+    name: string,
+  ): Promise<
+    ApiResponse<{ menuItem: string; name: string; description: string; price: number }[]>
+  > {
+    const response = await apiClient.post('/RestaurantMenu/_getMenuItemByName', {
+      name,
     })
     return response.data
   },

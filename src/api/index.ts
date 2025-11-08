@@ -7,7 +7,7 @@ export { userTastePreferencesApi } from './userTastePreferences'
 export { userAuthenticationApi } from './userAuthentication'
 export { restaurantMenuApi } from './restaurantMenu'
 export { feedbackApi } from './feedback'
-
+export { sessioningApi } from './sessioning'
 // Export User type (if needed in views)
 export interface User {
   id: number | string

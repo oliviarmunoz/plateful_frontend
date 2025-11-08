@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -47,19 +47,9 @@ const filteredRestaurants = computed(() => {
     .slice(0, 8) // Limit to 8 suggestions
 })
 
-// Check if user is logged in
-const getCurrentUser = () => {
-  const userData = localStorage.getItem('user')
-  if (userData) {
-    return JSON.parse(userData)
-  }
-  return null
-}
-
 // Redirect to login if not logged in
 onMounted(() => {
-  const user = getCurrentUser()
-  if (!user) {
+  if (!localStorage.getItem('auth_token')) {
     router.push('/login')
   }
 
@@ -111,13 +101,8 @@ const handleKeyDown = (event: KeyboardEvent) => {
       break
     case 'Enter':
       event.preventDefault()
-      if (selectedIndex.value >= 0) {
-        const selected = filteredRestaurants.value[selectedIndex.value]
-        if (typeof selected === 'string') {
-          selectRestaurant(selected)
-        } else {
-          handleSearch()
-        }
+      if (selectedIndex.value >= 0 && filteredRestaurants.value[selectedIndex.value]) {
+        selectRestaurant(filteredRestaurants.value[selectedIndex.value])
       } else {
         handleSearch()
       }
