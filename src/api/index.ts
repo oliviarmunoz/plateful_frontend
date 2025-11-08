@@ -13,6 +13,7 @@ export interface User {
   id: number | string
   username: string
   email?: string
+  sessionId?: string
 }
 
 // Re-export commonly used types for convenience

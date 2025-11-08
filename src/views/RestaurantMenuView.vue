@@ -20,6 +20,43 @@ const loading = ref(true)
 const error = ref('')
 const feedbackMessage = ref('')
 const submittingFeedback = ref(false)
+const normalizeApiEntries = (raw: unknown): unknown[] => {
+  if (Array.isArray(raw)) {
+    return raw
+  }
+  if (raw && typeof raw === 'object' && Array.isArray((raw as { data?: unknown }).data)) {
+    return (raw as { data: unknown[] }).data.filter(
+      (entry): entry is unknown => entry !== undefined && entry !== null,
+    )
+  }
+  return []
+}
+
+const findRecommendationEntry = (
+  raw: unknown,
+): { recommendation?: string; error?: string } | null => {
+  const entries = normalizeApiEntries(raw)
+  const match = entries.find(
+    (entry): entry is { recommendation?: string; error?: string } =>
+      !!entry &&
+      typeof entry === 'object' &&
+      (typeof (entry as { recommendation?: unknown }).recommendation === 'string' ||
+        typeof (entry as { error?: unknown }).error === 'string'),
+  )
+  return match ?? null
+}
+
+const findMenuItemId = (raw: unknown): string | undefined => {
+  const entries = normalizeApiEntries(raw)
+  const match = entries.find(
+    (entry): entry is { menuItem: string } =>
+      !!entry &&
+      typeof entry === 'object' &&
+      typeof (entry as { menuItem?: unknown }).menuItem === 'string',
+  )
+  return match?.menuItem
+}
+
 const getCurrentUser = async (): Promise<User | null> => {
   const authToken = localStorage.getItem('auth_token')
   if (!authToken) {
@@ -42,6 +79,7 @@ const getCurrentUser = async (): Promise<User | null> => {
     return {
       id: sessionUser,
       username,
+      sessionId: authToken,
     }
   } catch (err) {
     console.error('Failed to resolve current user:', err)
@@ -80,12 +118,13 @@ onMounted(async () => {
     try {
       const recommendationResponse = await restaurantMenuApi._getRecommendation(
         restaurantName,
-        currentUser.id,
+        String(currentUser.id),
       )
-      if (recommendationResponse?.error) {
-        error.value = recommendationResponse.error
-      } else if (recommendationResponse?.recommendation) {
-        recommendation.value = recommendationResponse.recommendation
+      const recommendationEntry = findRecommendationEntry(recommendationResponse as unknown)
+      if (recommendationEntry?.error) {
+        error.value = recommendationEntry.error
+      } else if (recommendationEntry?.recommendation) {
+        recommendation.value = recommendationEntry.recommendation
       }
     } catch (err: unknown) {
       const apiErr = err as { response?: { data?: { error?: string; message?: string } } }
@@ -145,7 +184,7 @@ const submitStarRating = async (dishName: string, rating: number, menuItemId?: s
   }
 }
 
-const addToLiked = async (dishName: string) => {
+const addToLiked = async (dishName: string, menuItemId?: string) => {
   const authToken = localStorage.getItem('auth_token')
   if (!authToken) {
     router.push('/login')
@@ -155,8 +194,11 @@ const addToLiked = async (dishName: string) => {
     submittingFeedback.value = true
     feedbackMessage.value = ''
 
-    const dishId = await restaurantMenuApi._getMenuItemByName(dishName)
-    await userTastePreferencesApi.addLikedDish({session: authToken, dish: dishId.menuItem})
+    const resolvedDishId =
+      menuItemId ??
+      findMenuItemId((await restaurantMenuApi._getMenuItemByName(dishName)) as unknown) ??
+      dishName
+    await userTastePreferencesApi.addLikedDish({ session: authToken, dish: resolvedDishId })
 
     feedbackMessage.value = `✓ Added "${dishName}" to your liked dishes!`
 
@@ -181,8 +223,11 @@ const addToDisliked = async (dishName: string, menuItemId?: string) => {
     submittingFeedback.value = true
     feedbackMessage.value = ''
 
-    const dishId = menuItemId || dishName // Use menuItem ID if available, fallback to name
-    await userTastePreferencesApi.addDislikedDish({session: authToken, dish: dishId})
+    const resolvedDishId =
+      menuItemId ??
+      findMenuItemId((await restaurantMenuApi._getMenuItemByName(dishName)) as unknown) ??
+      dishName
+    await userTastePreferencesApi.addDislikedDish({ session: authToken, dish: resolvedDishId })
 
     feedbackMessage.value = `✓ Added "${dishName}" to your disliked dishes!`
 

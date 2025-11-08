@@ -46,7 +46,9 @@ export const userAuthenticationApi = {
   },
 
   // Authenticate a user
-  async authenticate(payload: AuthenticatePayload) {
+  async authenticate(
+    payload: AuthenticatePayload,
+  ): Promise<{ user: string | number; session: string }> {
     const res = await apiClient.post<AuthenticateResponse>('/UserAuthentication/authenticate', {
       username: payload.username,
       password: payload.password,
@@ -59,15 +61,32 @@ export const userAuthenticationApi = {
     if (!data.user) {
       throw new Error('Authentication failed: no user returned')
     }
-    return { user: data.user, session: data.session }
+    if (data.session === undefined || data.session === null) {
+      throw new Error('Authentication failed: no session returned')
+    }
+    return { user: data.user, session: String(data.session) }
   },
 
   // Get the username of a user
-  async getUsername(userId: string | number) {
+  async getUsername(userId: string | number): Promise<GetUsernameResponse> {
     const res = await apiClient.post<GetUsernameResponse[]>('/UserAuthentication/_getUsername', {
       user: userId,
     })
-    return res.data
+    const data = res.data
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('No username returned')
+    }
+
+    const entry = data.find(
+      (candidate): candidate is GetUsernameResponse =>
+        !!candidate && typeof candidate === 'object' && typeof candidate.username === 'string',
+    )
+
+    if (!entry) {
+      throw new Error('Username response malformed')
+    }
+
+    return { username: entry.username }
   },
 
   // logout

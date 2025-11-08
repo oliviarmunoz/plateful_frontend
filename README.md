@@ -4,6 +4,8 @@
 - [Recording](/assignment-checkin/screen-recording.mov)
 - [Visual Design Study](/assignment-checkin/visual-design-study.md)
 
+- [Design Doc]()
+
 ## Application Pitch
 
 Name: Plateful

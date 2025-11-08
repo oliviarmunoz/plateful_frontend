@@ -101,11 +101,14 @@ const handleKeyDown = (event: KeyboardEvent) => {
       break
     case 'Enter':
       event.preventDefault()
-      if (selectedIndex.value >= 0 && filteredRestaurants.value[selectedIndex.value]) {
-        selectRestaurant(filteredRestaurants.value[selectedIndex.value])
-      } else {
-        handleSearch()
+      if (selectedIndex.value >= 0) {
+        const restaurant = filteredRestaurants.value[selectedIndex.value]
+        if (restaurant) {
+          selectRestaurant(restaurant)
+          break
+        }
       }
+      handleSearch()
       break
     case 'Escape':
       showDropdown.value = false

@@ -195,8 +195,8 @@ const loadUserData = async () => {
 
     // Load user's taste preferences
     const [likedResponse, dislikedResponse] = await Promise.all([
-      userTastePreferencesApi.getLikedDishes({ user: user.value.id }),
-      userTastePreferencesApi.getDislikedDishes({ user: user.value.id }),
+      userTastePreferencesApi.getLikedDishes({ user: String(user.value.id) }),
+      userTastePreferencesApi.getDislikedDishes({ user: String(user.value.id) }),
     ])
 
     const extractDishIdentifiers = (response: unknown): string[] => {
@@ -240,7 +240,7 @@ const loadUserData = async () => {
     // Fetch feedback for all dishes
 
     const feedbackResponse = await feedbackApi.getAllUserRatings({
-      author: user.value.id,
+      author: String(user.value.id),
     })
 
     if (Array.isArray(feedbackResponse) && feedbackResponse.length > 0) {
