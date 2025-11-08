@@ -1,5 +1,6 @@
 # Front-end Repo for Plateful
 
+_Assignment 4b_
 - [User Journey](/assignment-checkin/userJourney.md)
 - [Recording](/assignment-checkin/screen-recording.mov)
 - [Visual Design Study](/assignment-checkin/visual-design-study.md)
@@ -15,3 +16,5 @@ Key Features:
 Personalized Recommendations: When you search a restaurant, the app suggests a dish curated for you. Over time, as you mark what you liked or disliked, recommendations grow smarter and more tailored to your unique tastes. This reduces stress by helping you explore new foods, while making sure that every order feels like a safe but exciting choice. Now, customers are more likely to try new dishes, turning every meal into a positive experience.
 
 User History: See past recommended meals and how you rated them!
+
+use the app here! https://plateful-5stg.onrender.com/https://plateful-backend-dk0h.onrender.com/api/login
